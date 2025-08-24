@@ -1,0 +1,247 @@
+/* eslint-disable */
+const express = require("express");
+const Database = require("better-sqlite3");
+const cookieParser = require("cookie-parser");
+const bodyParser = require("body-parser");
+const path = require("path");
+
+// Setup
+const app = express();
+const db = new Database(":memory:");
+const PORT = process.env.PORT || 3000;
+
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
+// DB schema (in-memory)
+db.exec(CREATE TABLE users ( id TEXT PRIMARY KEY, email TEXT UNIQUE, role TEXT NOT NULL DEFAULT 'CUSTOMER' ); CREATE TABLE products ( id TEXT PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, description TEXT, price INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR', stock INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL ); CREATE TABLE images ( id TEXT PRIMARY KEY, productId TEXT NOT NULL, url TEXT NOT NULL, alt TEXT, FOREIGN KEY(productId) REFERENCES products(id) ON DELETE CASCADE ); CREATE TABLE carts ( id TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL ); CREATE TABLE cart_items ( id TEXT PRIMARY KEY, cartId TEXT NOT NULL, productId TEXT NOT NULL, qty INTEGER NOT NULL, unitPrice INTEGER NOT NULL, FOREIGN KEY(cartId) REFERENCES carts(id) ON DELETE CASCADE, FOREIGN KEY(productId) REFERENCES products(id) ); CREATE TABLE orders ( id TEXT PRIMARY KEY, total INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', paymentMethod TEXT NOT NULL, paymentStatus TEXT NOT NULL DEFAULT 'PENDING', address TEXT NOT NULL, createdAt INTEGER NOT NULL ); CREATE TABLE order_items ( id TEXT PRIMARY KEY, orderId TEXT NOT NULL, productId TEXT NOT NULL, qty INTEGER NOT NULL, unitPrice INTEGER NOT NULL, FOREIGN KEY(orderId) REFERENCES orders(id) ON DELETE CASCADE ););
+
+function cuid() {
+return "c" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+function now() { return Date.now(); }
+function slugify(s) {
+return s.toLowerCase().replace(/[^a-z0-9\s-]/g,"").trim().replace(/\s+/g,"-").replace(/-+/g,"-");
+}
+
+// Seed sample products
+(function seed() {
+const insert = db.prepare( INSERT INTO products (id, title, slug, description, price, stock, active, createdAt, updatedAt) VALUES (@id,@title,@slug,@description,@price,@stock,1,@createdAt,@updatedAt) );
+[
+{ title: "T-shirt Cotton", description: "Soft cotton tee", price: 49900, stock: 20 },
+{ title: "Mug Ceramic", description: "350ml ceramic mug", price: 29900, stock: 35 },
+{ title: "Notebook A5", description: "A5 ruled notebook", price: 19900, stock: 50 },
+].forEach(p => {
+const id = cuid();
+insert.run({
+id,
+title: p.title,
+slug: slugify(p.title),
+description: p.description,
+price: p.price,
+stock: p.stock,
+createdAt: now(),
+updatedAt: now(),
+});
+});
+})();
+
+// Helpers for HTML
+function page(title, content) {
+return `<!doctype html>
+
+<html lang="en"> <head> <meta charset="utf-8"> <title>${title}</title> <meta name="viewport" content="width=device-width,initial-scale=1"> <style> body { font-family: system-ui, Arial, sans-serif; margin:0; background:#f8fafc; color:#0f172a;} header { background:#fff; border-bottom:1px solid #e2e8f0; } nav { max-width:960px; margin:0 auto; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;} nav a { margin-left:12px; color:#2563eb; text-decoration:none;} main { max-width:960px; margin:0 auto; padding:16px; } .card { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:12px; } .grid { display:grid; gap:12px; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); } .btn { background:#0f172a; color:#fff; padding:8px 12px; border-radius:6px; text-decoration:none; display:inline-block; } .btn:disabled { opacity:.6 } input, textarea { width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; } label { font-size:12px; color:#475569; } .row { display:flex; justify-content:space-between; align-items:center; } .mt-2 { margin-top:8px } .mt-3{margin-top:12px} .mt-4{margin-top:16px} .mb-2 { margin-bottom:8px } .mb-3{margin-bottom:12px} .danger { color:#b91c1c } </style> </head> <body> <header> <nav> <div><a href="/">MyShop</a></div> <div> <a href="/products">Products</a> <a href="/cart">Cart</a> <a href="/admin">Admin</a> </div> </nav> </header> <main> ${content} </main> </body> </html>`; } function money(paisa) { return `₹${(paisa/100).toFixed(2)}`; }
+// Ensure cookie cart
+function getOrCreateCartId(req, res) {
+let cartId = req.cookies.cartId;
+if (!cartId) {
+cartId = cuid();
+db.prepare(INSERT INTO carts (id, createdAt, updatedAt) VALUES (?,?,?)).run(cartId, now(), now());
+res.cookie("cartId", cartId, { httpOnly: true, sameSite: "lax" });
+}
+return cartId;
+}
+
+// Routes: Home
+app.get("/", (req, res) => {
+res.send(page("MyShop", <h1>Welcome to MyShop</h1> <p class="mt-2">Browse products and add to cart. Admin can add/edit products.</p> <div class="mt-3"><a class="btn" href="/products">View Products</a></div> ));
+});
+
+// Products list
+app.get("/products", (req, res) => {
+const products = db.prepare(SELECT * FROM products WHERE active=1 ORDER BY createdAt DESC LIMIT 100).all();
+res.send(page("Products", <h2 class="mb-2">Products</h2> <div class="grid"> ${products.map(p =>
+<div class="card">
+<div class="row"><strong>${p.title}</strong><span>${money(p.price)}</span></div>
+<p class="mt-2" style="min-height:40px">${p.description || ""}</p>
+<a class="btn mt-2" href="/products/${p.slug}">View</a>
+</div>
+).join("")} </div> ));
+});
+
+// Product detail
+app.get("/products/:slug", (req, res) => {
+const product = db.prepare(SELECT * FROM products WHERE slug=?).get(req.params.slug);
+if (!product || !product.active) return res.status(404).send(page("Not found", "<p>Product not found.</p>"));
+res.send(page(product.title, <div class="row"><h2>${product.title}</h2><div>${money(product.price)}</div></div> <p class="mt-2">${product.description || ""}</p> <form class="mt-3" method="post" action="/api/cart/add"> <input type="hidden" name="productId" value="${product.id}"> <label>Quantity</label> <input name="qty" type="number" min="1" value="1"> <button class="btn mt-2" type="submit">Add to cart</button> </form> ));
+});
+
+// Cart view
+app.get("/cart", (req, res) => {
+const cartId = getOrCreateCartId(req, res);
+const items = db.prepare( SELECT ci.id, ci.qty, ci.unitPrice, p.title FROM cart_items ci JOIN products p ON p.id = ci.productId WHERE ci.cartId = ? ).all(cartId);
+const total = items.reduce((s,i)=> s + i.qty*i.unitPrice, 0);
+res.send(page("Cart", <h2 class="mb-2">Your Cart</h2> ${items.length===0 ? "<p>Cart is empty.</p>" :
+<div class="card">
+${items.map(i => <div class="row"> <span>${i.title} × ${i.qty}</span> <span>${money(i.qty*i.unitPrice)}</span> </div> ).join("")}
+<div class="row mt-3"><strong>Total</strong><strong>${money(total)}</strong></div>
+<div class="mt-3"><a class="btn" href="/checkout">Checkout</a></div>
+</div>
+} ));
+});
+
+// Checkout page
+app.get("/checkout", (req, res) => {
+res.send(page("Checkout", <h2 class="mb-2">Checkout (COD)</h2> <form method="post" action="/api/checkout" class="card"> <label>Name</label><input name="name" required> <label class="mt-2">Address Line</label><input name="line1" required> <label class="mt-2">City</label><input name="city" required> <label class="mt-2">State</label><input name="state" required> <label class="mt-2">ZIP</label><input name="zip" required> <label class="mt-2">Phone</label><input name="phone" required> <input type="hidden" name="paymentMethod" value="COD"> <button class="btn mt-3" type="submit">Place Order (COD)</button> </form> ));
+});
+
+// Admin: list
+app.get("/admin", (req, res) => {
+const products = db.prepare(SELECT * FROM products ORDER BY createdAt DESC).all();
+res.send(page("Admin", <h2 class="mb-3">Admin</h2> <a class="btn" href="/admin/products/new">New Product</a> <div class="mt-3"> ${products.map(p=>
+<div class="card">
+<div class="row">
+<div>${p.title} — ${money(p.price)} — stock ${p.stock} ${p.active? "":"<span class='danger'>(inactive)</span>"}</div>
+<div><a href="/admin/products/${p.id}">Edit</a></div>
+</div>
+</div>
+).join("")} </div> ));
+});
+
+// Admin: new product form
+app.get("/admin/products/new", (req, res) => {
+res.send(page("New Product", <h2 class="mb-2">New Product</h2> <form method="post" action="/admin/products/new" class="card"> <label>Title</label><input name="title" required> <label class="mt-2">Price (INR)</label><input name="price" type="number" step="0.01" required> <label class="mt-2">Stock</label><input name="stock" type="number" value="0" required> <label class="mt-2">Description</label><textarea name="description" rows="3"></textarea> <button class="btn mt-3" type="submit">Create</button> </form> ));
+});
+
+// Admin: create product action
+app.post("/admin/products/new", (req, res) => {
+const title = String(req.body.title||"").trim();
+const price = Math.round(Number(req.body.price||0)*100);
+const stock = Number(req.body.stock||0);
+const description = String(req.body.description||"").trim();
+if (!title || price<=0 || stock<0) return res.status(400).send("Invalid input");
+const id = cuid();
+const slug = slugify(title);
+try {
+db.prepare(INSERT INTO products (id,title,slug,description,price,stock,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,1,?,?)).run(id,title,slug,description,price,stock,now(),now());
+} catch (e) {
+return res.status(400).send("Duplicate title/slug or invalid data");
+}
+res.redirect("/admin");
+});
+
+// Admin: edit product form
+app.get("/admin/products/:id", (req, res) => {
+const p = db.prepare(SELECT * FROM products WHERE id=?).get(req.params.id);
+if (!p) return res.status(404).send(page("Not found", "<p>Product not found.</p>"));
+res.send(page("Edit Product", <h2 class="mb-2">Edit Product</h2> <form method="post" action="/admin/products/${p.id}" class="card"> <label>Title</label><input name="title" value="${escapeHtml(p.title)}" required> <label class="mt-2">Price (INR)</label><input name="price" type="number" step="0.01" value="${(p.price/100).toFixed(2)}" required> <label class="mt-2">Stock</label><input name="stock" type="number" value="${p.stock}" required> <label class="mt-2">Description</label><textarea name="description" rows="3">${escapeHtml(p.description||"")}</textarea> <label class="mt-2"><input type="checkbox" name="active" ${p.active? "checked":""}> Active</label> <div class="mt-3 row"> <button class="btn" type="submit">Save</button> <form method="post" action="/admin/products/${p.id}/delete" onsubmit="return confirm('Delete?')"> <button class="btn danger" type="submit" style="background:#b91c1c">Delete</button> </form> </div> </form> ));
+});
+
+// Admin: update product action
+app.post("/admin/products/:id", (req, res) => {
+const id = req.params.id;
+const title = String(req.body.title||"").trim();
+const price = Math.round(Number(req.body.price||0)*100);
+const stock = Number(req.body.stock||0);
+const description = String(req.body.description||"").trim();
+const active = req.body.active ? 1 : 0;
+if (!title || price<=0 || stock<0) return res.status(400).send("Invalid input");
+db.prepare(UPDATE products SET title=?, description=?, price=?, stock=?, active=?, updatedAt=? WHERE id=?)
+.run(title, description, price, stock, active, now(), id);
+res.redirect("/admin");
+});
+
+// Admin: delete product
+app.post("/admin/products/:id/delete", (req, res) => {
+db.prepare(DELETE FROM products WHERE id=?).run(req.params.id);
+res.redirect("/admin");
+});
+
+// API: add to cart
+app.post("/api/cart/add", (req, res) => {
+const cartId = getOrCreateCartId(req, res);
+const productId = String(req.body.productId || "");
+const qty = Math.max(1, parseInt(req.body.qty || "1", 10));
+const p = db.prepare(SELECT * FROM products WHERE id=? AND active=1).get(productId);
+if (!p) return res.status(400).send("Invalid product");
+// Check existing
+const existing = db.prepare(SELECT * FROM cart_items WHERE cartId=? AND productId=?).get(cartId, productId);
+if (existing) {
+db.prepare(UPDATE cart_items SET qty=? WHERE id=?).run(existing.qty + qty, existing.id);
+} else {
+db.prepare(INSERT INTO cart_items (id, cartId, productId, qty, unitPrice) VALUES (?,?,?,?,?))
+.run(cuid(), cartId, productId, qty, p.price);
+}
+db.prepare(UPDATE carts SET updatedAt=? WHERE id=?).run(now(), cartId);
+res.redirect("/cart");
+});
+
+// API: checkout (COD)
+app.post("/api/checkout", (req, res) => {
+const cartId = getOrCreateCartId(req, res);
+const items = db.prepare(SELECT * FROM cart_items WHERE cartId=?).all(cartId);
+if (items.length === 0) return res.status(400).send("Empty cart");
+
+// Stock check
+for (const it of items) {
+const p = db.prepare(SELECT stock, title FROM products WHERE id=?).get(it.productId);
+if (!p || it.qty > p.stock) {
+return res.send(page("Error", <p class="danger">Insufficient stock for ${escapeHtml(p ? p.title : "item")}.</p><p><a href="/cart">Back to cart</a></p>));
+}
+}
+
+// Total
+const total = items.reduce((s,i)=> s + i.qty*i.unitPrice, 0);
+const address = JSON.stringify({
+name: req.body.name, line1: req.body.line1, city: req.body.city,
+state: req.body.state, zip: req.body.zip, phone: req.body.phone
+});
+
+// Transaction
+for (const it of items) {
+db.prepare(UPDATE products SET stock = stock - ? WHERE id=?).run(it.qty, it.productId);
+}
+const orderId = cuid();
+db.prepare(INSERT INTO orders (id, total, status, paymentMethod, paymentStatus, address, createdAt) VALUES (?,?,?,?,?,?,?)).run(orderId, total, "PENDING", "COD", "PENDING", address, now());
+const insertItem = db.prepare(INSERT INTO order_items (id, orderId, productId, qty, unitPrice) VALUES (?,?,?,?,?));
+for (const it of items) {
+insertItem.run(cuid(), orderId, it.productId, it.qty, it.unitPrice);
+}
+db.prepare(DELETE FROM cart_items WHERE cartId=?).run(cartId);
+
+res.redirect(/orders/${orderId});
+});
+
+// Order confirmation page
+app.get("/orders/:id", (req, res) => {
+const o = db.prepare(SELECT * FROM orders WHERE id=?).get(req.params.id);
+if (!o) return res.status(404).send(page("Not found","<p>Order not found</p>"));
+const items = db.prepare( SELECT oi.qty, oi.unitPrice, p.title FROM order_items oi JOIN products p ON p.id = oi.productId WHERE oi.orderId=? ).all(o.id);
+res.send(page("Order", <h2 class="mb-2">Order #${o.id.slice(0,8)}</h2> <p>Status: ${o.status} | Payment: ${o.paymentStatus} (${o.paymentMethod})</p> <div class="card mt-3"> ${items.map(it=>
+<div class="row">
+<span>${it.title} × ${it.qty}</span>
+<span>${money(it.qty*it.unitPrice)}</span>
+</div>
+).join("")} <div class="row mt-3"><strong>Total</strong><strong>${money(o.total)}</strong></div> </div> <div class="mt-3"><a class="btn" href="/products">Continue Shopping</a></div> ));
+});
+
+// Utility: basic HTML escape
+function escapeHtml(s) {
+return String(s).replace(/[&<>"']/g, (c) => ({'&':'&','<':'<','>':'>','"':'"',"'":'''}[c]));
+}
+
+// Start server
+app.listen(PORT, () => {
+console.log(MyShop running at http://localhost:${PORT});
+});
