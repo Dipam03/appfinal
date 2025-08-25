@@ -3,35 +3,37 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Shopsy Home (Full)</title>
+<title>Shopsy Home (Profile + Orders + Wishlist + Dark Theme)</title>
 <style>
-  :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); }
-  body { margin:0; font-family:system-ui,Segoe UI,Arial; background:#fff; color:#111; }
-  .header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid #eee; position:sticky; top:0; background:#fff; z-index:10; }
+  :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); --bg:#fff; --fg:#111; --card:#fff; --border:#eee; --mutetext:#666; }
+  [data-theme="dark"] { --bg:#0b0f14; --fg:#e6eef7; --card:#10161d; --border:#1f2a35; --mutetext:#a5b2c1; --glow:rgba(0,102,255,.35); }
+  body { margin:0; font-family:system-ui,Segoe UI,Arial; background:var(--bg); color:var(--fg); }
+  .header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card); z-index:10; }
   .logo { font-weight:700; color:var(--accent); font-size:20px; }
   .search { flex:1; }
-  .search input { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; transition:border-color .3s, box-shadow .3s; }
+  .search input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); transition:border-color .3s, box-shadow .3s; }
   .search input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--glow); outline:0; }
 
   nav { display:flex; gap:10px; align-items:center; }
-  .btn { padding:8px 12px; border:1px solid #ddd; border-radius:999px; background:#fff; cursor:pointer; transition:transform .2s, box-shadow .2s; }
+  .btn { padding:8px 12px; border:1px solid var(--border); border-radius:999px; background:var(--card); color:var(--fg); cursor:pointer; transition:transform .2s, box-shadow .2s; }
   .btn:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.06); }
   .primary { background:var(--accent); color:#fff; border-color:var(--accent); }
   .primary:hover { transform:translateY(-1px) scale(1.02); box-shadow:0 8px 24px rgba(0,102,255,.25); }
 
-  .hero { padding:32px 16px; background:linear-gradient(180deg,#eef4ff,#fff); border-bottom:1px solid #eee; opacity:0; transform:translateY(8px); animation:fadeUp .6s ease .15s forwards; }
+  .hero { padding:32px 16px; background:linear-gradient(180deg,#eef4ff,transparent); border-bottom:1px solid var(--border); opacity:0; transform:translateY(8px); animation:fadeUp .6s ease .15s forwards; }
   @keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
 
+  section { border-color:var(--border); }
   .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); padding:16px; }
 
-  .tile { border:1px solid #eee; border-radius:12px; background:#fff; overflow:hidden; transition:transform .2s, box-shadow .2s, border-color .2s; }
-  .tile img { width:100%; height:120px; object-fit:cover; background:#f3f3f3; transition:transform .25s; }
+  .tile { border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden; transition:transform .2s, box-shadow .2s, border-color .2s; }
+  .tile img { width:100%; height:120px; object-fit:cover; background:#1a1a1a10; transition:transform .25s; }
   .tile span { display:block; padding:8px 10px; font-weight:600; }
   .tile:hover { transform:translateY(-4px); box-shadow:0 12px 28px rgba(0,0,0,.08), 0 0 0 4px var(--glow); border-color:transparent; }
   .tile:hover img { transform:scale(1.03); }
 
-  .card { border:1px solid #eee; border-radius:12px; background:#fff; overflow:hidden; transition:transform .2s, box-shadow .2s; }
-  .card img { width:100%; height:140px; object-fit:cover; background:#f3f3f3; transition:transform .3s; }
+  .card { border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden; transition:transform .2s, box-shadow .2s; }
+  .card img { width:100%; height:140px; object-fit:cover; background:#1a1a1a10; transition:transform .3s; }
   .card .info { padding:10px; }
   .price { color:#0a7; font-weight:700; }
   .card:hover { transform:translateY(-5px); box-shadow:0 14px 32px rgba(0,0,0,.10); }
@@ -41,9 +43,9 @@
   .badge.pulse { animation:pulse .5s ease; }
   @keyframes pulse { 0%{ transform:scale(1); } 50%{ transform:scale(1.2); } 100%{ transform:scale(1); } }
 
-  .contact { padding:16px; border-top:1px solid #eee; }
+  .contact { padding:16px; border-top:1px solid var(--border); }
   .contact form { display:grid; gap:10px; max-width:420px; }
-  input, textarea { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  input, textarea { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:var(--card); color:var(--fg); }
 
   .btn .spinner {
     --sz:16px;
@@ -59,74 +61,78 @@
   .btn.loading span.txt { opacity:.6; }
   .btn.loading .spinner { display:inline-block; }
 
-  footer { padding:20px 16px; text-align:center; color:#666; border-top:1px solid #eee; }
+  footer { padding:20px 16px; text-align:center; color:var(--mutetext); border-top:1px solid var(--border); }
 
   /* Account modal */
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1000; }
-  .modal { width:100%; max-width:420px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
-  .modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
+  .modal { width:100%; max-width:520px; background:var(--card); color:var(--fg); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
   .modal h3 { margin:0; font-size:18px; }
-  .modal .close { border:none; background:transparent; font-size:22px; cursor:pointer; line-height:1; }
-  .tabs { display:flex; gap:6px; padding:8px; border-bottom:1px solid #eee; }
-  .tabs button { flex:1; padding:8px; border-radius:999px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+  .modal .close { border:none; background:transparent; font-size:22px; cursor:pointer; line-height:1; color:var(--fg); }
+  .tabs { display:flex; gap:6px; padding:8px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .tabs button { flex:1; padding:8px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--fg); cursor:pointer; }
   .tabs button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .panel { display:none; padding:14px; }
   .panel.active { display:block; }
   .row { display:grid; gap:8px; margin-bottom:12px; }
-  .row input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; }
-  .muted { color:#666; font-size:13px; }
+  .row input { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); }
+  .muted { color:var(--mutetext); font-size:13px; }
   .alert { background:#fef3c7; border:1px solid #fde68a; color:#92400e; padding:8px 10px; border-radius:8px; margin:10px 14px; display:none; }
   .alert.show { display:block; }
 
   /* Cart drawer */
   .cart-toggle { position:relative; }
   .cart-drawer-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:1100; }
-  .cart-drawer { position:fixed; top:0; right:0; height:100%; width:360px; max-width:92vw; background:#fff; box-shadow:-16px 0 40px rgba(0,0,0,.18); transform:translateX(100%); transition:transform .3s ease; z-index:1200; display:flex; flex-direction:column; }
-  .cart-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #eee; }
+  .cart-drawer { position:fixed; top:0; right:0; height:100%; width:360px; max-width:92vw; background:var(--card); color:var(--fg); box-shadow:-16px 0 40px rgba(0,0,0,.18); transform:translateX(100%); transition:transform .3s ease; z-index:1200; display:flex; flex-direction:column; }
+  .cart-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); }
   .cart-items { flex:1; overflow:auto; padding:12px 12px 0; }
-  .cart-empty { padding:24px 16px; color:#666; }
-  .cart-item { display:grid; grid-template-columns:64px 1fr auto; gap:10px; padding:10px; border-bottom:1px solid #f2f2f2; align-items:center; }
-  .cart-item img { width:64px; height:64px; object-fit:cover; border-radius:8px; background:#f3f3f3; }
+  .cart-empty { padding:24px 16px; color:var(--mutetext); }
+  .cart-item { display:grid; grid-template-columns:64px 1fr auto; gap:10px; padding:10px; border-bottom:1px solid var(--border); align-items:center; }
+  .cart-item img { width:64px; height:64px; object-fit:cover; border-radius:8px; background:#1a1a1a10; }
   .cart-item h4 { margin:0 0 6px; font-size:14px; }
-  .cart-item .meta { font-size:13px; color:#666; }
+  .cart-item .meta { font-size:13px; color:var(--mutetext); }
   .qty { display:flex; align-items:center; gap:8px; }
-  .qty button { width:28px; height:28px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+  .qty button { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--fg); cursor:pointer; }
   .remove { background:transparent; border:none; color:#c00; cursor:pointer; font-size:13px; }
-  .cart-footer { border-top:1px solid #eee; padding:12px 16px; }
+  .cart-footer { border-top:1px solid var(--border); padding:12px 16px; }
   .cart-row { display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
   .cart-actions { display:flex; gap:8px; margin-top:10px; }
 
   /* Admin modal */
   .admin-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1300; }
-  .admin-modal { width:100%; max-width:520px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
-  .admin-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
-  .admin-modal h3 { margin:0; font-size:18px; }
+  .admin-modal { width:100%; max-width:520px; background:var(--card); color:var(--fg); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .admin-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
   .admin-body { display:grid; gap:16px; padding:14px; }
-  .admin-card { border:1px solid #eee; border-radius:12px; padding:12px; }
+  .admin-card { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
   .admin-card h4 { margin:0 0 10px; }
   .admin-card .row { display:grid; gap:8px; }
-  .admin-card input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; }
+  .admin-card input { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--fg); }
   .admin-gate { display:grid; gap:8px; }
-  .admin-badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #ddd; }
+  .admin-badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); }
 
   /* Checkout modal */
   .checkout-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1400; }
-  .checkout-modal { width:100%; max-width:560px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
-  .checkout-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
+  .checkout-modal { width:100%; max-width:560px; background:var(--card); color:var(--fg); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .checkout-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
   .checkout-body { display:grid; gap:14px; padding:14px; grid-template-columns:1fr; }
   @media (min-width: 720px) { .checkout-body { grid-template-columns:1fr 1fr; } }
   .ck-row { display:grid; gap:8px; }
-  .ck-row input, .ck-row textarea, .ck-row select { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font:inherit; }
-  .summary { border:1px solid #eee; border-radius:12px; padding:12px; }
+  .ck-row input, .ck-row textarea, .ck-row select { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:var(--card); color:var(--fg); }
+  .summary { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
   .summary h4 { margin:0 0 8px; }
   .summary .line { display:flex; justify-content:space-between; margin:4px 0; }
-  .summary .items { max-height:180px; overflow:auto; border-top:1px dashed #eee; margin-top:8px; padding-top:8px; font-size:14px; color:#444; }
+  .summary .items { max-height:180px; overflow:auto; border-top:1px dashed var(--border); margin-top:8px; padding-top:8px; font-size:14px; color:var(--mutetext); }
+
+  /* Orders */
+  .order-card { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
+  .order-line { display:flex; justify-content:space-between; margin:4px 0; font-size:14px; }
+  .order-items { margin-top:8px; font-size:13px; color:var(--mutetext); white-space:pre-line; }
 
   /* Celebration overlay */
   .celebrate-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:2000; }
-  .celebrate-card { background:#fff; border-radius:16px; padding:24px 20px; max-width:420px; width:92vw; text-align:center; box-shadow:0 18px 64px rgba(0,0,0,.25); animation:fadeUp .35s ease forwards; opacity:0; transform:translateY(10px); }
+  .celebrate-card { background:var(--card); color:var(--fg); border-radius:16px; padding:24px 20px; max-width:420px; width:92vw; text-align:center; box-shadow:0 18px 64px rgba(0,0,0,.25); animation:fadeUp .35s ease forwards; opacity:0; transform:translateY(10px); }
   .celebrate-title { font-size:20px; margin:10px 0 6px; }
-  .celebrate-sub { color:#555; }
+  .celebrate-sub { color:var(--mutetext); }
   .checkwrap { width:96px; height:96px; margin:0 auto; position:relative; }
   .checkwrap svg { width:100%; height:100%; display:block; }
   .check-circle { stroke:#22c55e; stroke-width:6; fill:none; stroke-linecap:round; stroke-dasharray: 300; stroke-dashoffset: 300; animation:draw 0.6s ease forwards 0.1s; }
@@ -137,7 +143,7 @@
 <script type="module" defer>
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-  import { getFirestore, collection, getDocs, query, limit, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { getFirestore, collection, getDocs, query, limit, addDoc, serverTimestamp, doc, setDoc, getDoc, deleteDoc, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
   // Firebase config (provided)
   const firebaseConfig = {
@@ -161,6 +167,13 @@
     search: () => document.getElementById('search'),
     cartCount: () => document.getElementById('cartCount'),
     loginBtn: () => document.getElementById('loginBtn'),
+    myProfileBtn: () => document.getElementById('myProfileBtn'),
+    adminBtn: () => document.getElementById('adminBtn'),
+    openWishlist: () => document.getElementById('openWishlist'),
+    themeToggle: () => document.getElementById('themeToggle'),
+    userPill: () => document.getElementById('userPill'),
+    userAvatar: () => document.getElementById('userAvatar'),
+    userName: () => document.getElementById('userName'),
     contactForm: () => document.getElementById('contactForm'),
     sendBtn: () => document.getElementById('sendBtn'),
 
@@ -169,9 +182,13 @@
     tabLogin: () => document.getElementById('tabLogin'),
     tabSignup: () => document.getElementById('tabSignup'),
     tabProfile: () => document.getElementById('tabProfile'),
+    tabOrders: () => document.getElementById('tabOrders'),
+    tabWishlist: () => document.getElementById('tabWishlist'),
     panelLogin: () => document.getElementById('panelLogin'),
     panelSignup: () => document.getElementById('panelSignup'),
     panelProfile: () => document.getElementById('panelProfile'),
+    panelOrders: () => document.getElementById('panelOrders'),
+    panelWishlist: () => document.getElementById('panelWishlist'),
     alertBox: () => document.getElementById('alertBox'),
     formLogin: () => document.getElementById('formLogin'),
     formSignup: () => document.getElementById('formSignup'),
@@ -188,7 +205,6 @@
     clearCart: () => document.getElementById('clearCart'),
     checkoutBtn: () => document.getElementById('checkoutBtn'),
 
-    adminBtn: () => document.getElementById('adminBtn'),
     adminBackdrop: () => document.getElementById('adminBackdrop'),
     closeAdmin: () => document.getElementById('closeAdmin'),
     adminCode: () => document.getElementById('adminCode'),
@@ -211,32 +227,38 @@
     celebrate: () => document.getElementById('celebrate'),
     celebrateMsg: () => document.getElementById('celebrateMsg'),
     celebrateClose: () => document.getElementById('celebrateClose'),
+
+    ordersList: () => document.getElementById('ordersList'),
+    wishlistList: () => document.getElementById('wishlistList'),
   };
+
+  // Theme
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // [5]
+  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // [5]
+  document.addEventListener('DOMContentLoaded', initTheme);
+  els.themeToggle().addEventListener('change', () => {
+    const t = els.themeToggle().checked ? 'dark' : 'light';
+    localStorage.setItem('theme', t);
+    applyTheme(t);
+  }); // [5]
 
   // State
   let allProducts = [];
   let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+  let wishlist = new Set();
 
   // Cart helpers
   function updateCartBadge() {
     const n = cart.reduce((s, i) => s + i.qty, 0);
     const badge = els.cartCount();
     badge.textContent = n;
-    badge.classList.remove('pulse');
-    void badge.offsetWidth;
-    badge.classList.add('pulse'); // pulse on change. [2]
+    badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); // [2]
   }
-  function cartSave() {
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartBadge();
-    renderCart(); // sync drawer. [2]
-  }
+  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // [2]
   function addToCart(id) {
-    const item = allProducts.find(p => p.id === id);
-    if (!item) return;
+    const item = allProducts.find(p => p.id === id); if (!item) return;
     const existing = cart.find(c => c.id === id);
-    if (existing) existing.qty += 1;
-    else cart.push({ id: item.id, title: item.title, price: Number(item.price) || 0, imageUrl: item.imageUrl, qty: 1 });
+    if (existing) existing.qty += 1; else cart.push({ id: item.id, title: item.title, price: Number(item.price) || 0, imageUrl: item.imageUrl, qty: 1 });
     cartSave();
   }
   function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); }
@@ -245,22 +267,36 @@
   function clearCart() { cart = []; cartSave(); }
   function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); }
 
-  // Renderers
-  function renderProducts(list) {
-    els.productGrid().innerHTML = list.map(p => `
+  // Product card with wishlist heart
+  function cardTemplate(p, wished) {
+    return `
       <div class="card">
         <img src="${p.imageUrl}" alt="${p.title}" />
         <div class="info">
           <h3 style="margin:0 0 6px;font-size:16px">${p.title}</h3>
           <div class="price">₹${p.price}</div>
-          <button data-id="${p.id}" class="btn">Add to cart</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button data-id="${p.id}" class="btn add">Add to cart</button>
+            <button data-id="${p.id}" class="wish btn" title="Wishlist" style="${wished?'color:#e11d48;border-color:#e11d48':''}">❤</button>
+          </div>
         </div>
       </div>
-    `).join('');
+    `;
+  } // [2]
+
+  function renderProducts(list) {
+    els.productGrid().innerHTML = list.map(p => cardTemplate(p, wishlist.has(p.id))).join('');
     els.productGrid().querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => addToCart(btn.dataset.id));
+      if (btn.classList.contains('wish')) {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id; const pd = allProducts.find(x => x.id === id);
+          if (pd) toggleWishlist(id, pd);
+        });
+      } else {
+        btn.addEventListener('click', () => addToCart(btn.dataset.id));
+      }
     });
-  }
+  } // [2]
 
   function renderCategories(list) {
     els.categoryGrid().innerHTML = list.map(c => `
@@ -276,15 +312,13 @@
         renderProducts(filtered);
       });
     });
-  }
+  } // [2]
 
   async function loadHome() {
-    const catSnap = await getDocs(collection(db, 'categories')); // Read categories. [2]
-    const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderCategories(categories);
-
-    const q = query(collection(db, 'products'), limit(20));      // Read products. [2]
-    const prodSnap = await getDocs(q);
+    const catSnap = await getDocs(collection(db, 'categories')); // [2]
+    renderCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const qref = query(collection(db, 'products'), limit(20));   // [2]
+    const prodSnap = await getDocs(qref);
     allProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderProducts(allProducts);
   }
@@ -293,9 +327,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     els.search().addEventListener('input', e => {
       const q = e.target.value.trim().toLowerCase();
-      const filtered = allProducts.filter(p =>
-        p.title.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q)
-      );
+      const filtered = allProducts.filter(p => p.title.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
       renderProducts(filtered);
     });
   });
@@ -307,111 +339,184 @@
   els.closeAccount().addEventListener('click', closeAccount);
   els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); });
 
+  // Tabs
   function setTab(name) {
-    const tabs = [els.tabLogin(), els.tabSignup(), els.tabProfile()];
-    const panels = [els.panelLogin(), els.panelSignup(), els.panelProfile()];
-    tabs.forEach(b => b.classList.remove('active'));
-    panels.forEach(p => p.classList.remove('active'));
-    if (name === 'login') { els.tabLogin().classList.add('active'); els.panelLogin().classList.add('active'); }
-    if (name === 'signup') { els.tabSignup().classList.add('active'); els.panelSignup().classList.add('active'); }
-    if (name === 'profile') { els.tabProfile().classList.add('active'); els.panelProfile().classList.add('active'); }
-  }
-  els.tabLogin().addEventListener('click', () => setTab('login'));
-  els.tabSignup().addEventListener('click', () => setTab('signup'));
-  els.tabProfile().addEventListener('click', () => setTab('profile'));
+    const tabs = [els.tabLogin(), els.tabSignup(), els.tabProfile(), els.tabOrders(), els.tabWishlist()];
+    const panels = [els.panelLogin(), els.panelSignup(), els.panelProfile(), els.panelOrders(), els.panelWishlist()];
+    tabs.forEach(b => b && b.classList.remove('active'));
+    panels.forEach(p => p && p.classList.remove('active'));
+    const map = { login:'tabLogin', signup:'tabSignup', profile:'tabProfile', orders:'tabOrders', wishlist:'tabWishlist' };
+    const pmap = { login:'panelLogin', signup:'panelSignup', profile:'panelProfile', orders:'panelOrders', wishlist:'panelWishlist' };
+    const tb = els[map[name]] && els[map[name]](); const pn = els[pmap[name]] && els[pmap[name]]();
+    if (tb) tb.classList.add('active'); if (pn) pn.classList.add('active');
+  } // [3]
+  function openProfile() { openAccount(); setTab('profile'); } // [3]
+  document.addEventListener('DOMContentLoaded', () => {
+    els.tabOrders() && els.tabOrders().addEventListener('click', () => { setTab('orders'); loadMyOrders(); });
+    els.tabWishlist() && els.tabWishlist().addEventListener('click', () => { setTab('wishlist'); loadMyWishlist(); });
+    els.myProfileBtn() && els.myProfileBtn().addEventListener('click', openProfile);
+    els.openWishlist() && els.openWishlist().addEventListener('click', () => { openAccount(); setTab('wishlist'); loadMyWishlist(); });
+  });
+
   function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); }
 
+  // Firestore user profile upsert
+  async function upsertUserProfile(user) {
+    if (!user) return;
+    const ref = doc(db, 'users', user.uid);
+    const snap = await getDoc(ref);
+    const base = { uid: user.uid, email: user.email || null, displayName: user.displayName || null, photoURL: user.photoURL || null, updatedAt: serverTimestamp() };
+    if (!snap.exists()) await setDoc(ref, { ...base, createdAt: serverTimestamp() }); else await setDoc(ref, base, { merge: true }); // [3]
+  }
+
+  // Header user pill
+  function updateUserPill(user) {
+    if (!user) { els.userPill().style.display='none'; return; }
+    els.userPill().style.display = '';
+    const name = user.displayName || (user.email ? user.email.split('@') : 'Me');
+    els.userName().textContent = name;
+    const ph = user.photoURL || 'https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=' + encodeURIComponent(name);
+    els.userAvatar().src = ph;
+    els.userPill().onclick = () => { openAccount(); setTab('profile'); };
+  } // [3]
+
+  // Auth flows
   els.formLogin().addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(els.formLogin());
     const email = data.get('email'); const password = data.get('password');
     try {
-      await signInWithEmailAndPassword(auth, email, password); // Sign in. [1]
+      await signInWithEmailAndPassword(auth, email, password); // [1]
+      await upsertUserProfile(auth.currentUser);               // [3]
+      openProfile();
       showAlert('Logged in');
-      setTab('profile');
     } catch (err) { showAlert(err.message); }
   });
+
   els.formSignup().addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(els.formSignup());
     const name = (data.get('name') || '').toString();
     const email = data.get('email'); const password = data.get('password');
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password); // Create user. [1]
-      if (name) await updateProfile(cred.user, { displayName: name }); // Set name. [5]
+      const cred = await createUserWithEmailAndPassword(auth, email, password); // [1]
+      if (name) await updateProfile(cred.user, { displayName: name });         // [3]
+      await upsertUserProfile(cred.user);                                      // [3]
+      openProfile();
       showAlert('Account created');
-      setTab('profile');
     } catch (err) { showAlert(err.message); }
   });
+
   els.doReset().addEventListener('click', async () => {
     const email = (new FormData(els.formLogin()).get('email') || '').toString();
     if (!email) { showAlert('Enter email in login form first'); return; }
-    try {
-      await sendPasswordResetEmail(auth, email); // Reset email. [1]
-      showAlert('Password reset email sent');
-    } catch (err) { showAlert(err.message); }
+    try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); } // [1]
   });
+
   els.formProfile().addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(els.formProfile());
     const displayName = (data.get('displayName') || '').toString() || null;
     const photoURL = (data.get('photoURL') || '').toString() || null;
-    const user = auth.currentUser;
-    if (!user) { showAlert('Not signed in'); return; }
+    const user = auth.currentUser; if (!user) { showAlert('Not signed in'); return; }
     try {
-      await updateProfile(user, { displayName, photoURL }); // Update profile. [5]
+      await updateProfile(user, { displayName, photoURL });                    // [3]
+      await upsertUserProfile({ ...user, displayName, photoURL });            // [3]
+      document.querySelector('#panelProfile [name="displayName"]').value = displayName || '';
+      document.querySelector('#panelProfile [name="photoURL"]').value = photoURL || '';
+      updateUserPill({ ...user, displayName, photoURL });
       showAlert('Profile updated');
     } catch (err) { showAlert(err.message); }
   });
+
   els.doSignOut().addEventListener('click', async () => {
-    await signOut(auth); // Sign out. [1]
-    showAlert('Signed out');
-    setTab('login');
-    setAdmin(false);
+    await signOut(auth); showAlert('Signed out'); setTab('login'); setAdmin(false); // [1]
   });
-  onAuthStateChanged(auth, (user) => {
-    els.loginBtn().textContent = user ? (user.displayName || user.email || 'Account') : 'Login'; // Label. [1]
-    document.querySelector('#panelProfile [name="displayName"]').value = user?.displayName || '';
-    document.querySelector('#panelProfile [name="photoURL"]').value = user?.photoURL || '';
+
+  // Wishlist
+  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // [2]
+  async function loadMyWishlist() {
+    const col = userWishlistCol(); if (!col) { wishlist = new Set(); renderWishlistPanel(); return; }
+    const snap = await getDocs(col); wishlist = new Set(snap.docs.map(d => d.id)); renderWishlistPanel();
+  } // [2]
+  async function toggleWishlist(productId, productData) {
+    const col = userWishlistCol(); if (!col) { alert('Sign in to use wishlist'); return; }
+    const ref = doc(db, 'users', auth.currentUser.uid, 'wishlist', productId);
+    if (wishlist.has(productId)) { await deleteDoc(ref); wishlist.delete(productId); }
+    else {
+      await setDoc(ref, { id: productId, title: productData.title, price: Number(productData.price)||0, imageUrl: productData.imageUrl || null, category: productData.category || null, addedAt: serverTimestamp() });
+      wishlist.add(productId);
+    }
+    renderProducts(allProducts); renderWishlistPanel();
+  } // [2]
+  function renderWishlistPanel() {
+    const items = allProducts.filter(p => wishlist.has(p.id));
+    els.wishlistList().innerHTML = items.length ? items.map(p => cardTemplate(p, true)).join('') : '<div class="muted">No items in wishlist.</div>';
+    els.wishlistList().querySelectorAll('button').forEach(btn => {
+      if (btn.classList.contains('wish')) {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id; const pd = allProducts.find(x => x.id === id);
+          if (pd) toggleWishlist(id, pd);
+        });
+      } else {
+        btn.addEventListener('click', () => addToCart(btn.dataset.id));
+      }
+    });
+  } // [2]
+
+  // Orders
+  async function loadMyOrders() {
+    if (!auth.currentUser) { els.ordersList().innerHTML = '<div class="muted">Sign in to see orders.</div>'; return; }
+    const qref = query(collection(db, 'orders'), where('userId','==',auth.currentUser.uid), orderBy('createdAt','desc')); // [2]
+    const snap = await getDocs(qref);
+    if (snap.empty) { els.ordersList().innerHTML = '<div class="muted">No orders yet.</div>'; return; }
+    els.ordersList().innerHTML = snap.docs.map(d => {
+      const o = d.data();
+      const itemsText = (o.items||[]).map(i => `${i.title} x${i.qty} = ₹${(Number(i.price)||0)*(i.qty||0)}`).join('\n');
+      return `
+        <div class="order-card">
+          <div class="order-line"><span>Order ID</span><strong>${d.id}</strong></div>
+          <div class="order-line"><span>Status</span><strong>${o.status||'pending'}</strong></div>
+          <div class="order-line"><span>Total</span><strong>₹${o.total||o.subtotal||0}</strong></div>
+          <div class="order-items">${itemsText}</div>
+        </div>
+      `;
+    }).join('');
+  } // [2]
+
+  // Auth listener: toggle header, pill, wishlist
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      await upsertUserProfile(user);                       // [3]
+      els.loginBtn().style.display = 'none';
+      els.adminBtn().style.display = 'none';
+      els.myProfileBtn().style.display = '';
+      updateUserPill(user);                                // [3]
+      await loadMyWishlist();                              // [2]
+    } else {
+      els.loginBtn().style.display = '';
+      els.adminBtn().style.display = '';
+      els.myProfileBtn().style.display = 'none';
+      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts); // [3][2]
+    }
   });
 
   // EmailJS contact
   window.addEventListener('load', () => {
-    const form = els.contactForm();
-    const btn = els.sendBtn();
+    const form = els.contactForm(); const btn = els.sendBtn();
     form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      btn.classList.add('loading');
-      try {
-        await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); // sendForm. [3]
-        form.reset();
-        alert('Message sent!');
-      } catch (err) {
-        console.error(err);
-        alert('Failed to send.');
-      } finally {
-        btn.classList.remove('loading');
-      }
+      e.preventDefault(); btn.classList.add('loading');
+      try { await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); form.reset(); alert('Message sent!'); } // [4]
+      catch (err) { console.error(err); alert('Failed to send.'); }
+      finally { btn.classList.remove('loading'); }
     });
   });
 
   // Cart drawer
-  function openCartDrawer() {
-    els.cartDrawer().style.transform = 'translateX(0)';
-    els.cartDrawer().setAttribute('aria-hidden', 'false');
-    els.cartBackdrop().style.display = 'block';
-  }
-  function closeCartDrawer() {
-    els.cartDrawer().style.transform = 'translateX(100%)';
-    els.cartDrawer().setAttribute('aria-hidden', 'true');
-    els.cartBackdrop().style.display = 'none';
-  }
+  function openCartDrawer() { els.cartDrawer().style.transform = 'translateX(0)'; els.cartDrawer().setAttribute('aria-hidden','false'); els.cartBackdrop().style.display = 'block'; }
+  function closeCartDrawer() { els.cartDrawer().style.transform = 'translateX(100%)'; els.cartDrawer().setAttribute('aria-hidden','true'); els.cartBackdrop().style.display = 'none'; }
   function renderCart() {
-    if (cart.length === 0) {
-      els.cartItems().innerHTML = '<div class="cart-empty">Cart is empty.</div>';
-      els.cartSubtotal().textContent = '₹0';
-      return;
-    }
+    if (cart.length === 0) { els.cartItems().innerHTML = '<div class="cart-empty">Cart is empty.</div>'; els.cartSubtotal().textContent = '₹0'; return; }
     els.cartItems().innerHTML = cart.map(i => `
       <div class="cart-item">
         <img src="${i.imageUrl}" alt="${i.title}" />
@@ -459,107 +564,62 @@
   }
   els.unlockAdmin().addEventListener('click', () => {
     const code = (els.adminCode().value || '').trim();
-    if (code === '741223') {
-      setAdmin(true); // Client-side only; secure with rules in prod. [6][7]
-      alert('Admin unlocked');
-    } else {
-      alert('Invalid code');
-    }
-  });
-  onAuthStateChanged(auth, (user) => { if (!user) setAdmin(false); });
+    if (code === '741223') { setAdmin(true); alert('Admin unlocked'); } else { alert('Invalid code'); }
+  }); // [3]
 
   // Admin: Add product
   document.getElementById('formAddProduct').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!isAdmin()) { alert('Admin locked'); return; }
+    e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
     const fd = new FormData(e.currentTarget);
-    const data = {
-      title: (fd.get('title') || '').toString(),
-      price: Number(fd.get('price') || 0),
-      imageUrl: (fd.get('imageUrl') || '').toString(),
-      category: (fd.get('category') || '').toString(),
-      stock: parseInt(fd.get('stock') || '0', 10),
-      createdAt: Date.now(),
-    };
-    try {
-      await addDoc(collection(db, 'products'), data); // Write product. [2]
-      alert('Product added');
-      e.currentTarget.reset();
-      loadHome(); // Refresh. [2]
-    } catch (err) {
-      console.error(err);
-      alert('Failed to add product');
-    }
+    const data = { title: (fd.get('title')||'').toString(), price: Number(fd.get('price')||0), imageUrl: (fd.get('imageUrl')||'').toString(), category: (fd.get('category')||'').toString(), stock: parseInt(fd.get('stock')||'0',10), createdAt: Date.now() };
+    try { await addDoc(collection(db,'products'), data); alert('Product added'); e.currentTarget.reset(); loadHome(); } // [2]
+    catch (err) { console.error(err); alert('Failed to add product'); }
   });
 
   // Admin: Add category
   document.getElementById('formAddCategory').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!isAdmin()) { alert('Admin locked'); return; }
+    e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
     const fd = new FormData(e.currentTarget);
-    const data = {
-      name: (fd.get('name') || '').toString(),
-      slug: (fd.get('slug') || '').toString(),
-      imageUrl: (fd.get('imageUrl') || '').toString(),
-      createdAt: Date.now(),
-    };
-    try {
-      await addDoc(collection(db, 'categories'), data); // Write category. [2]
-      alert('Category added');
-      e.currentTarget.reset();
-      loadHome(); // Refresh. [2]
-    } catch (err) {
-      console.error(err);
-      alert('Failed to add category');
-    }
+    const data = { name:(fd.get('name')||'').toString(), slug:(fd.get('slug')||'').toString(), imageUrl:(fd.get('imageUrl')||'').toString(), createdAt: Date.now() };
+    try { await addDoc(collection(db,'categories'), data); alert('Category added'); e.currentTarget.reset(); loadHome(); } // [2]
+    catch (err) { console.error(err); alert('Failed to add category'); }
   });
 
   // Checkout modal and order placement
   function openCheckout() {
-    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // Auth gate. [1]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // Cart gate. [2]
+    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // [1]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }          // [2]
     els.checkoutForm().querySelector('[name="email"]').value = auth.currentUser.email || '';
     const subtotal = cartSubtotalValue();
     els.ckItemsCount().textContent = cart.reduce((s,i)=>s+(i.qty||0),0);
     els.ckSubtotal().textContent = `₹${subtotal}`;
     els.ckTotal().textContent = `₹${subtotal}`;
     els.ckItemsList().innerHTML = cart.map(i => `${i.title} — ₹${i.price} × ${i.qty}`).join('<br/>');
-    els.checkoutBackdrop().style.display = 'flex';
-    els.checkoutBackdrop().setAttribute('aria-hidden','false');
+    els.checkoutBackdrop().style.display = 'flex'; els.checkoutBackdrop().setAttribute('aria-hidden','false');
   }
-  function closeCheckoutModal() {
-    els.checkoutBackdrop().style.display = 'none';
-    els.checkoutBackdrop().setAttribute('aria-hidden','true');
-  }
+  function closeCheckoutModal() { els.checkoutBackdrop().style.display = 'none'; els.checkoutBackdrop().setAttribute('aria-hidden','true'); }
   els.closeCheckout().addEventListener('click', closeCheckoutModal);
   els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); });
 
   // Celebration helpers
   function showCelebration(message) {
     if (message) els.celebrateMsg().textContent = message;
-    els.celebrate().style.display = 'flex';
-    els.celebrate().setAttribute('aria-hidden', 'false');
-    setTimeout(() => {
-      // center burst
-      if (window.confetti) {
-        confetti({ particleCount: 120, startVelocity: 35, spread: 70, origin: { x: 0.5, y: 0.4 } });
-        confetti({ particleCount: 80, angle: 60, spread: 50, origin: { x: 0 } });
-        confetti({ particleCount: 80, angle: 120, spread: 50, origin: { x: 1 } });
-      }
-    }, 150);
+    els.celebrate().style.display = 'flex'; els.celebrate().setAttribute('aria-hidden','false');
+    setTimeout(() => { if (window.confetti) {
+      confetti({ particleCount: 120, startVelocity: 35, spread: 70, origin: { x: 0.5, y: 0.4 } });
+      confetti({ particleCount: 80, angle: 60, spread: 50, origin: { x: 0 } });
+      confetti({ particleCount: 80, angle: 120, spread: 50, origin: { x: 1 } });
+    }}, 150);
   }
-  function hideCelebration() {
-    els.celebrate().style.display = 'none';
-    els.celebrate().setAttribute('aria-hidden', 'true');
-  }
+  function hideCelebration() { els.celebrate().style.display = 'none'; els.celebrate().setAttribute('aria-hidden','true'); }
   els.celebrateClose().addEventListener('click', hideCelebration);
   els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); });
 
   // Place order
   els.checkoutForm().addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!auth.currentUser) { alert('Not signed in.'); return; } // Safety. [1]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // Safety. [2]
+    if (!auth.currentUser) { alert('Not signed in.'); return; } // [1]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // [2]
 
     const fd = new FormData(els.checkoutForm());
     const payload = {
@@ -582,51 +642,25 @@
     els.placeOrderBtn().classList.add('loading');
 
     try {
-      const ref = await addDoc(collection(db, 'orders'), payload); // Create order. [8][2]
+      const ref = await addDoc(collection(db, 'orders'), payload); // [2]
       const orderId = ref.id;
-
-      // Optional: order email
       try {
         const itemsText = payload.items.map(i => `${i.title} x${i.qty} = ₹${i.price * i.qty}`).join('\n');
-        await emailjs.send('service_c4p68ag', 'template_214uijp', {
-          name: payload.fullName,
-          email: payload.email,
-          order_id: orderId,
-          items_text: itemsText,
-          total: `₹${payload.total}`,
-        }); // Email send. [9][10]
-      } catch (emailErr) {
-        console.warn('Email send failed (continuing):', emailErr);
-      }
-
-      // Clear cart and celebrate
-      cart = [];
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartBadge();
-      renderCart();
-      closeCheckoutModal();
-      showCelebration(`Order ID: ${orderId}`);
-
-    } catch (err) {
-      console.error(err);
-      alert('Failed to place order. Please try again.');
-    } finally {
-      els.placeOrderBtn().classList.remove('loading');
-    }
+        await emailjs.send('service_c4p68ag', 'template_214uijp', { name: payload.fullName, email: payload.email, order_id: orderId, items_text: itemsText, total: `₹${payload.total}` }); // [4]
+      } catch (emailErr) { console.warn('Email send failed (continuing):', emailErr); }
+      cart = []; localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); closeCheckoutModal(); showCelebration(`Order ID: ${orderId}`);
+    } catch (err) { console.error(err); alert('Failed to place order. Please try again.'); }
+    finally { els.placeOrderBtn().classList.remove('loading'); }
   });
 
   // Bootstrap
-  updateCartBadge();
-  renderCart();
-  loadHome(); // Load data. [2]
+  updateCartBadge(); renderCart(); loadHome(); // [2]
 </script>
 
 <!-- EmailJS SDK + init -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
 <script defer>
-  window.addEventListener('load', () => {
-    emailjs.init('E8cAV9p-pSYDnM8kE'); // EmailJS public key. [3]
-  });
+  window.addEventListener('load', () => { emailjs.init('E8cAV9p-pSYDnM8kE'); }); /* EmailJS public key */ <!-- [4] -->
 </script>
 <!-- Canvas Confetti CDN -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js" defer></script>
@@ -637,14 +671,24 @@
     <div class="search"><input id="search" placeholder="Search products..." /></div>
     <nav>
       <button id="loginBtn" class="btn">Login</button>
+      <button id="myProfileBtn" class="btn" style="display:none">My Profile</button>
       <button id="adminBtn" class="btn">Admin</button>
       <button id="openCart" class="btn cart-toggle">Cart <span id="cartCount" class="badge">0</span></button>
+      <button id="openWishlist" class="btn" title="My Wishlist">❤</button>
+      <label style="display:flex;align-items:center;gap:6px;margin-left:8px">
+        <input id="themeToggle" type="checkbox" />
+        <span>Dark</span>
+      </label>
+      <div id="userPill" class="btn" style="display:none;gap:8px;align-items:center">
+        <img id="userAvatar" alt="avatar" style="width:22px;height:22px;border-radius:50%;object-fit:cover" />
+        <span id="userName"></span>
+      </div>
     </nav>
   </header>
 
   <section class="hero">
     <h1>Big Savings, Daily</h1>
-    <p>Discover deals across fashion, electronics, and more.</p>
+    <p class="muted">Discover deals across fashion, electronics, and more.</p>
   </section>
 
   <section>
@@ -682,6 +726,8 @@
         <button id="tabLogin" class="active">Log in</button>
         <button id="tabSignup">Sign up</button>
         <button id="tabProfile">Profile</button>
+        <button id="tabOrders">Orders</button>
+        <button id="tabWishlist">Wishlist</button>
       </div>
 
       <div id="alertBox" class="alert"></div>
@@ -712,6 +758,14 @@
           <button class="btn primary" type="submit">Save profile</button>
         </form>
         <button id="doSignOut" class="btn" type="button">Sign out</button>
+      </section>
+
+      <section id="panelOrders" class="panel">
+        <div id="ordersList" class="row" style="gap:12px"></div>
+      </section>
+
+      <section id="panelWishlist" class="panel">
+        <div id="wishlistList" class="grid"></div>
       </section>
     </div>
   </div>
