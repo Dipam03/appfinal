@@ -1,247 +1,835 @@
-/* eslint-disable */
-const express = require("express");
-const Database = require("better-sqlite3");
-const cookieParser = require("cookie-parser");
-const bodyParser = require("body-parser");
-const path = require("path");
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Shopsy Home (Full)</title>
+<style>
+  :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); }
+  body { margin:0; font-family:system-ui,Segoe UI,Arial; background:#fff; color:#111; }
+  .header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid #eee; position:sticky; top:0; background:#fff; z-index:10; }
+  .logo { font-weight:700; color:var(--accent); font-size:20px; }
+  .search { flex:1; }
+  .search input { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; transition:border-color .3s, box-shadow .3s; }
+  .search input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--glow); outline:0; }
 
-// Setup
-const app = express();
-const db = new Database(":memory:");
-const PORT = process.env.PORT || 3000;
+  nav { display:flex; gap:10px; align-items:center; }
+  .btn { padding:8px 12px; border:1px solid #ddd; border-radius:999px; background:#fff; cursor:pointer; transition:transform .2s, box-shadow .2s; }
+  .btn:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.06); }
+  .primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .primary:hover { transform:translateY(-1px) scale(1.02); box-shadow:0 8px 24px rgba(0,102,255,.25); }
 
-app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+  .hero { padding:32px 16px; background:linear-gradient(180deg,#eef4ff,#fff); border-bottom:1px solid #eee; opacity:0; transform:translateY(8px); animation:fadeUp .6s ease .15s forwards; }
+  @keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
 
-// DB schema (in-memory)
-db.exec(CREATE TABLE users ( id TEXT PRIMARY KEY, email TEXT UNIQUE, role TEXT NOT NULL DEFAULT 'CUSTOMER' ); CREATE TABLE products ( id TEXT PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, description TEXT, price INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR', stock INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL ); CREATE TABLE images ( id TEXT PRIMARY KEY, productId TEXT NOT NULL, url TEXT NOT NULL, alt TEXT, FOREIGN KEY(productId) REFERENCES products(id) ON DELETE CASCADE ); CREATE TABLE carts ( id TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL ); CREATE TABLE cart_items ( id TEXT PRIMARY KEY, cartId TEXT NOT NULL, productId TEXT NOT NULL, qty INTEGER NOT NULL, unitPrice INTEGER NOT NULL, FOREIGN KEY(cartId) REFERENCES carts(id) ON DELETE CASCADE, FOREIGN KEY(productId) REFERENCES products(id) ); CREATE TABLE orders ( id TEXT PRIMARY KEY, total INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', paymentMethod TEXT NOT NULL, paymentStatus TEXT NOT NULL DEFAULT 'PENDING', address TEXT NOT NULL, createdAt INTEGER NOT NULL ); CREATE TABLE order_items ( id TEXT PRIMARY KEY, orderId TEXT NOT NULL, productId TEXT NOT NULL, qty INTEGER NOT NULL, unitPrice INTEGER NOT NULL, FOREIGN KEY(orderId) REFERENCES orders(id) ON DELETE CASCADE ););
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); padding:16px; }
 
-function cuid() {
-return "c" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-function now() { return Date.now(); }
-function slugify(s) {
-return s.toLowerCase().replace(/[^a-z0-9\s-]/g,"").trim().replace(/\s+/g,"-").replace(/-+/g,"-");
-}
+  .tile { border:1px solid #eee; border-radius:12px; background:#fff; overflow:hidden; transition:transform .2s, box-shadow .2s, border-color .2s; }
+  .tile img { width:100%; height:120px; object-fit:cover; background:#f3f3f3; transition:transform .25s; }
+  .tile span { display:block; padding:8px 10px; font-weight:600; }
+  .tile:hover { transform:translateY(-4px); box-shadow:0 12px 28px rgba(0,0,0,.08), 0 0 0 4px var(--glow); border-color:transparent; }
+  .tile:hover img { transform:scale(1.03); }
 
-// Seed sample products
-(function seed() {
-const insert = db.prepare( INSERT INTO products (id, title, slug, description, price, stock, active, createdAt, updatedAt) VALUES (@id,@title,@slug,@description,@price,@stock,1,@createdAt,@updatedAt) );
-[
-{ title: "T-shirt Cotton", description: "Soft cotton tee", price: 49900, stock: 20 },
-{ title: "Mug Ceramic", description: "350ml ceramic mug", price: 29900, stock: 35 },
-{ title: "Notebook A5", description: "A5 ruled notebook", price: 19900, stock: 50 },
-].forEach(p => {
-const id = cuid();
-insert.run({
-id,
-title: p.title,
-slug: slugify(p.title),
-description: p.description,
-price: p.price,
-stock: p.stock,
-createdAt: now(),
-updatedAt: now(),
-});
-});
-})();
+  .card { border:1px solid #eee; border-radius:12px; background:#fff; overflow:hidden; transition:transform .2s, box-shadow .2s; }
+  .card img { width:100%; height:140px; object-fit:cover; background:#f3f3f3; transition:transform .3s; }
+  .card .info { padding:10px; }
+  .price { color:#0a7; font-weight:700; }
+  .card:hover { transform:translateY(-5px); box-shadow:0 14px 32px rgba(0,0,0,.10); }
+  .card:hover img { transform:scale(1.05); }
 
-// Helpers for HTML
-function page(title, content) {
-return `<!doctype html>
+  .badge { position:relative; top:-6px; margin-left:6px; background:#ff3b30; color:#fff; border-radius:999px; padding:2px 8px; font-size:12px; display:inline-block; }
+  .badge.pulse { animation:pulse .5s ease; }
+  @keyframes pulse { 0%{ transform:scale(1); } 50%{ transform:scale(1.2); } 100%{ transform:scale(1); } }
 
-<html lang="en"> <head> <meta charset="utf-8"> <title>${title}</title> <meta name="viewport" content="width=device-width,initial-scale=1"> <style> body { font-family: system-ui, Arial, sans-serif; margin:0; background:#f8fafc; color:#0f172a;} header { background:#fff; border-bottom:1px solid #e2e8f0; } nav { max-width:960px; margin:0 auto; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;} nav a { margin-left:12px; color:#2563eb; text-decoration:none;} main { max-width:960px; margin:0 auto; padding:16px; } .card { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:12px; } .grid { display:grid; gap:12px; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); } .btn { background:#0f172a; color:#fff; padding:8px 12px; border-radius:6px; text-decoration:none; display:inline-block; } .btn:disabled { opacity:.6 } input, textarea { width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; } label { font-size:12px; color:#475569; } .row { display:flex; justify-content:space-between; align-items:center; } .mt-2 { margin-top:8px } .mt-3{margin-top:12px} .mt-4{margin-top:16px} .mb-2 { margin-bottom:8px } .mb-3{margin-bottom:12px} .danger { color:#b91c1c } </style> </head> <body> <header> <nav> <div><a href="/">MyShop</a></div> <div> <a href="/products">Products</a> <a href="/cart">Cart</a> <a href="/admin">Admin</a> </div> </nav> </header> <main> ${content} </main> </body> </html>`; } function money(paisa) { return `₹${(paisa/100).toFixed(2)}`; }
-// Ensure cookie cart
-function getOrCreateCartId(req, res) {
-let cartId = req.cookies.cartId;
-if (!cartId) {
-cartId = cuid();
-db.prepare(INSERT INTO carts (id, createdAt, updatedAt) VALUES (?,?,?)).run(cartId, now(), now());
-res.cookie("cartId", cartId, { httpOnly: true, sameSite: "lax" });
-}
-return cartId;
-}
+  .contact { padding:16px; border-top:1px solid #eee; }
+  .contact form { display:grid; gap:10px; max-width:420px; }
+  input, textarea { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font:inherit; }
 
-// Routes: Home
-app.get("/", (req, res) => {
-res.send(page("MyShop", <h1>Welcome to MyShop</h1> <p class="mt-2">Browse products and add to cart. Admin can add/edit products.</p> <div class="mt-3"><a class="btn" href="/products">View Products</a></div> ));
-});
+  .btn .spinner {
+    --sz:16px;
+    width:var(--sz); height:var(--sz);
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.6);
+    border-top-color:#fff;
+    margin-left:8px;
+    display:none;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .btn.loading span.txt { opacity:.6; }
+  .btn.loading .spinner { display:inline-block; }
 
-// Products list
-app.get("/products", (req, res) => {
-const products = db.prepare(SELECT * FROM products WHERE active=1 ORDER BY createdAt DESC LIMIT 100).all();
-res.send(page("Products", <h2 class="mb-2">Products</h2> <div class="grid"> ${products.map(p =>
-<div class="card">
-<div class="row"><strong>${p.title}</strong><span>${money(p.price)}</span></div>
-<p class="mt-2" style="min-height:40px">${p.description || ""}</p>
-<a class="btn mt-2" href="/products/${p.slug}">View</a>
-</div>
-).join("")} </div> ));
-});
+  footer { padding:20px 16px; text-align:center; color:#666; border-top:1px solid #eee; }
 
-// Product detail
-app.get("/products/:slug", (req, res) => {
-const product = db.prepare(SELECT * FROM products WHERE slug=?).get(req.params.slug);
-if (!product || !product.active) return res.status(404).send(page("Not found", "<p>Product not found.</p>"));
-res.send(page(product.title, <div class="row"><h2>${product.title}</h2><div>${money(product.price)}</div></div> <p class="mt-2">${product.description || ""}</p> <form class="mt-3" method="post" action="/api/cart/add"> <input type="hidden" name="productId" value="${product.id}"> <label>Quantity</label> <input name="qty" type="number" min="1" value="1"> <button class="btn mt-2" type="submit">Add to cart</button> </form> ));
-});
+  /* Account modal */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal { width:100%; max-width:420px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
+  .modal h3 { margin:0; font-size:18px; }
+  .modal .close { border:none; background:transparent; font-size:22px; cursor:pointer; line-height:1; }
+  .tabs { display:flex; gap:6px; padding:8px; border-bottom:1px solid #eee; }
+  .tabs button { flex:1; padding:8px; border-radius:999px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+  .tabs button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .panel { display:none; padding:14px; }
+  .panel.active { display:block; }
+  .row { display:grid; gap:8px; margin-bottom:12px; }
+  .row input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; }
+  .muted { color:#666; font-size:13px; }
+  .alert { background:#fef3c7; border:1px solid #fde68a; color:#92400e; padding:8px 10px; border-radius:8px; margin:10px 14px; display:none; }
+  .alert.show { display:block; }
 
-// Cart view
-app.get("/cart", (req, res) => {
-const cartId = getOrCreateCartId(req, res);
-const items = db.prepare( SELECT ci.id, ci.qty, ci.unitPrice, p.title FROM cart_items ci JOIN products p ON p.id = ci.productId WHERE ci.cartId = ? ).all(cartId);
-const total = items.reduce((s,i)=> s + i.qty*i.unitPrice, 0);
-res.send(page("Cart", <h2 class="mb-2">Your Cart</h2> ${items.length===0 ? "<p>Cart is empty.</p>" :
-<div class="card">
-${items.map(i => <div class="row"> <span>${i.title} × ${i.qty}</span> <span>${money(i.qty*i.unitPrice)}</span> </div> ).join("")}
-<div class="row mt-3"><strong>Total</strong><strong>${money(total)}</strong></div>
-<div class="mt-3"><a class="btn" href="/checkout">Checkout</a></div>
-</div>
-} ));
-});
+  /* Cart drawer */
+  .cart-toggle { position:relative; }
+  .cart-drawer-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:1100; }
+  .cart-drawer { position:fixed; top:0; right:0; height:100%; width:360px; max-width:92vw; background:#fff; box-shadow:-16px 0 40px rgba(0,0,0,.18); transform:translateX(100%); transition:transform .3s ease; z-index:1200; display:flex; flex-direction:column; }
+  .cart-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #eee; }
+  .cart-items { flex:1; overflow:auto; padding:12px 12px 0; }
+  .cart-empty { padding:24px 16px; color:#666; }
+  .cart-item { display:grid; grid-template-columns:64px 1fr auto; gap:10px; padding:10px; border-bottom:1px solid #f2f2f2; align-items:center; }
+  .cart-item img { width:64px; height:64px; object-fit:cover; border-radius:8px; background:#f3f3f3; }
+  .cart-item h4 { margin:0 0 6px; font-size:14px; }
+  .cart-item .meta { font-size:13px; color:#666; }
+  .qty { display:flex; align-items:center; gap:8px; }
+  .qty button { width:28px; height:28px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+  .remove { background:transparent; border:none; color:#c00; cursor:pointer; font-size:13px; }
+  .cart-footer { border-top:1px solid #eee; padding:12px 16px; }
+  .cart-row { display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
+  .cart-actions { display:flex; gap:8px; margin-top:10px; }
 
-// Checkout page
-app.get("/checkout", (req, res) => {
-res.send(page("Checkout", <h2 class="mb-2">Checkout (COD)</h2> <form method="post" action="/api/checkout" class="card"> <label>Name</label><input name="name" required> <label class="mt-2">Address Line</label><input name="line1" required> <label class="mt-2">City</label><input name="city" required> <label class="mt-2">State</label><input name="state" required> <label class="mt-2">ZIP</label><input name="zip" required> <label class="mt-2">Phone</label><input name="phone" required> <input type="hidden" name="paymentMethod" value="COD"> <button class="btn mt-3" type="submit">Place Order (COD)</button> </form> ));
-});
+  /* Admin modal */
+  .admin-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1300; }
+  .admin-modal { width:100%; max-width:520px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .admin-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
+  .admin-modal h3 { margin:0; font-size:18px; }
+  .admin-body { display:grid; gap:16px; padding:14px; }
+  .admin-card { border:1px solid #eee; border-radius:12px; padding:12px; }
+  .admin-card h4 { margin:0 0 10px; }
+  .admin-card .row { display:grid; gap:8px; }
+  .admin-card input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; }
+  .admin-gate { display:grid; gap:8px; }
+  .admin-badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #ddd; }
 
-// Admin: list
-app.get("/admin", (req, res) => {
-const products = db.prepare(SELECT * FROM products ORDER BY createdAt DESC).all();
-res.send(page("Admin", <h2 class="mb-3">Admin</h2> <a class="btn" href="/admin/products/new">New Product</a> <div class="mt-3"> ${products.map(p=>
-<div class="card">
-<div class="row">
-<div>${p.title} — ${money(p.price)} — stock ${p.stock} ${p.active? "":"<span class='danger'>(inactive)</span>"}</div>
-<div><a href="/admin/products/${p.id}">Edit</a></div>
-</div>
-</div>
-).join("")} </div> ));
-});
+  /* Checkout modal */
+  .checkout-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1400; }
+  .checkout-modal { width:100%; max-width:560px; background:#fff; border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .checkout-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee; }
+  .checkout-body { display:grid; gap:14px; padding:14px; grid-template-columns:1fr; }
+  @media (min-width: 720px) { .checkout-body { grid-template-columns:1fr 1fr; } }
+  .ck-row { display:grid; gap:8px; }
+  .ck-row input, .ck-row textarea, .ck-row select { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  .summary { border:1px solid #eee; border-radius:12px; padding:12px; }
+  .summary h4 { margin:0 0 8px; }
+  .summary .line { display:flex; justify-content:space-between; margin:4px 0; }
+  .summary .items { max-height:180px; overflow:auto; border-top:1px dashed #eee; margin-top:8px; padding-top:8px; font-size:14px; color:#444; }
 
-// Admin: new product form
-app.get("/admin/products/new", (req, res) => {
-res.send(page("New Product", <h2 class="mb-2">New Product</h2> <form method="post" action="/admin/products/new" class="card"> <label>Title</label><input name="title" required> <label class="mt-2">Price (INR)</label><input name="price" type="number" step="0.01" required> <label class="mt-2">Stock</label><input name="stock" type="number" value="0" required> <label class="mt-2">Description</label><textarea name="description" rows="3"></textarea> <button class="btn mt-3" type="submit">Create</button> </form> ));
-});
+  /* Celebration overlay */
+  .celebrate-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:2000; }
+  .celebrate-card { background:#fff; border-radius:16px; padding:24px 20px; max-width:420px; width:92vw; text-align:center; box-shadow:0 18px 64px rgba(0,0,0,.25); animation:fadeUp .35s ease forwards; opacity:0; transform:translateY(10px); }
+  .celebrate-title { font-size:20px; margin:10px 0 6px; }
+  .celebrate-sub { color:#555; }
+  .checkwrap { width:96px; height:96px; margin:0 auto; position:relative; }
+  .checkwrap svg { width:100%; height:100%; display:block; }
+  .check-circle { stroke:#22c55e; stroke-width:6; fill:none; stroke-linecap:round; stroke-dasharray: 300; stroke-dashoffset: 300; animation:draw 0.6s ease forwards 0.1s; }
+  .check-mark { stroke:#22c55e; stroke-width:6; fill:none; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray: 50; stroke-dashoffset: 50; animation:draw 0.5s ease forwards 0.5s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+</style>
 
-// Admin: create product action
-app.post("/admin/products/new", (req, res) => {
-const title = String(req.body.title||"").trim();
-const price = Math.round(Number(req.body.price||0)*100);
-const stock = Number(req.body.stock||0);
-const description = String(req.body.description||"").trim();
-if (!title || price<=0 || stock<0) return res.status(400).send("Invalid input");
-const id = cuid();
-const slug = slugify(title);
-try {
-db.prepare(INSERT INTO products (id,title,slug,description,price,stock,active,createdAt,updatedAt) VALUES (?,?,?,?,?,?,1,?,?)).run(id,title,slug,description,price,stock,now(),now());
-} catch (e) {
-return res.status(400).send("Duplicate title/slug or invalid data");
-}
-res.redirect("/admin");
-});
+<script type="module" defer>
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+  import { getFirestore, collection, getDocs, query, limit, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-// Admin: edit product form
-app.get("/admin/products/:id", (req, res) => {
-const p = db.prepare(SELECT * FROM products WHERE id=?).get(req.params.id);
-if (!p) return res.status(404).send(page("Not found", "<p>Product not found.</p>"));
-res.send(page("Edit Product", <h2 class="mb-2">Edit Product</h2> <form method="post" action="/admin/products/${p.id}" class="card"> <label>Title</label><input name="title" value="${escapeHtml(p.title)}" required> <label class="mt-2">Price (INR)</label><input name="price" type="number" step="0.01" value="${(p.price/100).toFixed(2)}" required> <label class="mt-2">Stock</label><input name="stock" type="number" value="${p.stock}" required> <label class="mt-2">Description</label><textarea name="description" rows="3">${escapeHtml(p.description||"")}</textarea> <label class="mt-2"><input type="checkbox" name="active" ${p.active? "checked":""}> Active</label> <div class="mt-3 row"> <button class="btn" type="submit">Save</button> <form method="post" action="/admin/products/${p.id}/delete" onsubmit="return confirm('Delete?')"> <button class="btn danger" type="submit" style="background:#b91c1c">Delete</button> </form> </div> </form> ));
-});
+  // Firebase config (provided)
+  const firebaseConfig = {
+    apiKey: "AIzaSyC5MGkOf5_0cF-xQrcA1PBSSvq6Y-AarSc",
+    authDomain: "ds-mart-888d2.firebaseapp.com",
+    projectId: "ds-mart-888d2",
+    storageBucket: "ds-mart-888d2.firebasestorage.app",
+    messagingSenderId: "108308848034",
+    appId: "1:108308848034:web:a8b3fe5e8784a4771e66fb",
+    measurementId: "G-KY618BJER7",
+  };
 
-// Admin: update product action
-app.post("/admin/products/:id", (req, res) => {
-const id = req.params.id;
-const title = String(req.body.title||"").trim();
-const price = Math.round(Number(req.body.price||0)*100);
-const stock = Number(req.body.stock||0);
-const description = String(req.body.description||"").trim();
-const active = req.body.active ? 1 : 0;
-if (!title || price<=0 || stock<0) return res.status(400).send("Invalid input");
-db.prepare(UPDATE products SET title=?, description=?, price=?, stock=?, active=?, updatedAt=? WHERE id=?)
-.run(title, description, price, stock, active, now(), id);
-res.redirect("/admin");
-});
+  const app = initializeApp(firebaseConfig); // Firebase init. [1]
+  const auth = getAuth(app);                 // Auth. [1]
+  const db = getFirestore(app);              // Firestore. [2]
 
-// Admin: delete product
-app.post("/admin/products/:id/delete", (req, res) => {
-db.prepare(DELETE FROM products WHERE id=?).run(req.params.id);
-res.redirect("/admin");
-});
+  // Elements
+  const els = {
+    productGrid: () => document.getElementById('productGrid'),
+    categoryGrid: () => document.getElementById('categoryGrid'),
+    search: () => document.getElementById('search'),
+    cartCount: () => document.getElementById('cartCount'),
+    loginBtn: () => document.getElementById('loginBtn'),
+    contactForm: () => document.getElementById('contactForm'),
+    sendBtn: () => document.getElementById('sendBtn'),
 
-// API: add to cart
-app.post("/api/cart/add", (req, res) => {
-const cartId = getOrCreateCartId(req, res);
-const productId = String(req.body.productId || "");
-const qty = Math.max(1, parseInt(req.body.qty || "1", 10));
-const p = db.prepare(SELECT * FROM products WHERE id=? AND active=1).get(productId);
-if (!p) return res.status(400).send("Invalid product");
-// Check existing
-const existing = db.prepare(SELECT * FROM cart_items WHERE cartId=? AND productId=?).get(cartId, productId);
-if (existing) {
-db.prepare(UPDATE cart_items SET qty=? WHERE id=?).run(existing.qty + qty, existing.id);
-} else {
-db.prepare(INSERT INTO cart_items (id, cartId, productId, qty, unitPrice) VALUES (?,?,?,?,?))
-.run(cuid(), cartId, productId, qty, p.price);
-}
-db.prepare(UPDATE carts SET updatedAt=? WHERE id=?).run(now(), cartId);
-res.redirect("/cart");
-});
+    accountModal: () => document.getElementById('accountModal'),
+    closeAccount: () => document.getElementById('closeAccount'),
+    tabLogin: () => document.getElementById('tabLogin'),
+    tabSignup: () => document.getElementById('tabSignup'),
+    tabProfile: () => document.getElementById('tabProfile'),
+    panelLogin: () => document.getElementById('panelLogin'),
+    panelSignup: () => document.getElementById('panelSignup'),
+    panelProfile: () => document.getElementById('panelProfile'),
+    alertBox: () => document.getElementById('alertBox'),
+    formLogin: () => document.getElementById('formLogin'),
+    formSignup: () => document.getElementById('formSignup'),
+    formProfile: () => document.getElementById('formProfile'),
+    doReset: () => document.getElementById('doReset'),
+    doSignOut: () => document.getElementById('doSignOut'),
 
-// API: checkout (COD)
-app.post("/api/checkout", (req, res) => {
-const cartId = getOrCreateCartId(req, res);
-const items = db.prepare(SELECT * FROM cart_items WHERE cartId=?).all(cartId);
-if (items.length === 0) return res.status(400).send("Empty cart");
+    openCart: () => document.getElementById('openCart'),
+    cartDrawer: () => document.getElementById('cartDrawer'),
+    cartBackdrop: () => document.getElementById('cartBackdrop'),
+    cartItems: () => document.getElementById('cartItems'),
+    cartSubtotal: () => document.getElementById('cartSubtotal'),
+    closeCart: () => document.getElementById('closeCart'),
+    clearCart: () => document.getElementById('clearCart'),
+    checkoutBtn: () => document.getElementById('checkoutBtn'),
 
-// Stock check
-for (const it of items) {
-const p = db.prepare(SELECT stock, title FROM products WHERE id=?).get(it.productId);
-if (!p || it.qty > p.stock) {
-return res.send(page("Error", <p class="danger">Insufficient stock for ${escapeHtml(p ? p.title : "item")}.</p><p><a href="/cart">Back to cart</a></p>));
-}
-}
+    adminBtn: () => document.getElementById('adminBtn'),
+    adminBackdrop: () => document.getElementById('adminBackdrop'),
+    closeAdmin: () => document.getElementById('closeAdmin'),
+    adminCode: () => document.getElementById('adminCode'),
+    unlockAdmin: () => document.getElementById('unlockAdmin'),
+    adminState: () => document.getElementById('adminState'),
+    productCard: () => document.getElementById('productCard'),
+    categoryCard: () => document.getElementById('categoryCard'),
+    formAddProduct: () => document.getElementById('formAddProduct'),
+    formAddCategory: () => document.getElementById('formAddCategory'),
 
-// Total
-const total = items.reduce((s,i)=> s + i.qty*i.unitPrice, 0);
-const address = JSON.stringify({
-name: req.body.name, line1: req.body.line1, city: req.body.city,
-state: req.body.state, zip: req.body.zip, phone: req.body.phone
-});
+    checkoutBackdrop: () => document.getElementById('checkoutBackdrop'),
+    closeCheckout: () => document.getElementById('closeCheckout'),
+    checkoutForm: () => document.getElementById('checkoutForm'),
+    placeOrderBtn: () => document.getElementById('placeOrderBtn'),
+    ckItemsCount: () => document.getElementById('ckItemsCount'),
+    ckSubtotal: () => document.getElementById('ckSubtotal'),
+    ckTotal: () => document.getElementById('ckTotal'),
+    ckItemsList: () => document.getElementById('ckItemsList'),
 
-// Transaction
-for (const it of items) {
-db.prepare(UPDATE products SET stock = stock - ? WHERE id=?).run(it.qty, it.productId);
-}
-const orderId = cuid();
-db.prepare(INSERT INTO orders (id, total, status, paymentMethod, paymentStatus, address, createdAt) VALUES (?,?,?,?,?,?,?)).run(orderId, total, "PENDING", "COD", "PENDING", address, now());
-const insertItem = db.prepare(INSERT INTO order_items (id, orderId, productId, qty, unitPrice) VALUES (?,?,?,?,?));
-for (const it of items) {
-insertItem.run(cuid(), orderId, it.productId, it.qty, it.unitPrice);
-}
-db.prepare(DELETE FROM cart_items WHERE cartId=?).run(cartId);
+    celebrate: () => document.getElementById('celebrate'),
+    celebrateMsg: () => document.getElementById('celebrateMsg'),
+    celebrateClose: () => document.getElementById('celebrateClose'),
+  };
 
-res.redirect(/orders/${orderId});
-});
+  // State
+  let allProducts = [];
+  let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 
-// Order confirmation page
-app.get("/orders/:id", (req, res) => {
-const o = db.prepare(SELECT * FROM orders WHERE id=?).get(req.params.id);
-if (!o) return res.status(404).send(page("Not found","<p>Order not found</p>"));
-const items = db.prepare( SELECT oi.qty, oi.unitPrice, p.title FROM order_items oi JOIN products p ON p.id = oi.productId WHERE oi.orderId=? ).all(o.id);
-res.send(page("Order", <h2 class="mb-2">Order #${o.id.slice(0,8)}</h2> <p>Status: ${o.status} | Payment: ${o.paymentStatus} (${o.paymentMethod})</p> <div class="card mt-3"> ${items.map(it=>
-<div class="row">
-<span>${it.title} × ${it.qty}</span>
-<span>${money(it.qty*it.unitPrice)}</span>
-</div>
-).join("")} <div class="row mt-3"><strong>Total</strong><strong>${money(o.total)}</strong></div> </div> <div class="mt-3"><a class="btn" href="/products">Continue Shopping</a></div> ));
-});
+  // Cart helpers
+  function updateCartBadge() {
+    const n = cart.reduce((s, i) => s + i.qty, 0);
+    const badge = els.cartCount();
+    badge.textContent = n;
+    badge.classList.remove('pulse');
+    void badge.offsetWidth;
+    badge.classList.add('pulse'); // pulse on change. [2]
+  }
+  function cartSave() {
+    localStorage.setItem('cart', JSON.stringify(cart));
+    updateCartBadge();
+    renderCart(); // sync drawer. [2]
+  }
+  function addToCart(id) {
+    const item = allProducts.find(p => p.id === id);
+    if (!item) return;
+    const existing = cart.find(c => c.id === id);
+    if (existing) existing.qty += 1;
+    else cart.push({ id: item.id, title: item.title, price: Number(item.price) || 0, imageUrl: item.imageUrl, qty: 1 });
+    cartSave();
+  }
+  function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); }
+  function decQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty = Math.max(0, it.qty - 1); if (it.qty === 0) cart = cart.filter(i => i.id !== id); cartSave(); }
+  function removeItem(id) { cart = cart.filter(i => i.id !== id); cartSave(); }
+  function clearCart() { cart = []; cartSave(); }
+  function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); }
 
-// Utility: basic HTML escape
-function escapeHtml(s) {
-return String(s).replace(/[&<>"']/g, (c) => ({'&':'&','<':'<','>':'>','"':'"',"'":'''}[c]));
-}
+  // Renderers
+  function renderProducts(list) {
+    els.productGrid().innerHTML = list.map(p => `
+      <div class="card">
+        <img src="${p.imageUrl}" alt="${p.title}" />
+        <div class="info">
+          <h3 style="margin:0 0 6px;font-size:16px">${p.title}</h3>
+          <div class="price">₹${p.price}</div>
+          <button data-id="${p.id}" class="btn">Add to cart</button>
+        </div>
+      </div>
+    `).join('');
+    els.productGrid().querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => addToCart(btn.dataset.id));
+    });
+  }
 
-// Start server
-app.listen(PORT, () => {
-console.log(MyShop running at http://localhost:${PORT});
-});
+  function renderCategories(list) {
+    els.categoryGrid().innerHTML = list.map(c => `
+      <div class="tile" data-slug="${c.slug}">
+        <img src="${c.imageUrl}" alt="${c.name}" />
+        <span>${c.name}</span>
+      </div>
+    `).join('');
+    els.categoryGrid().querySelectorAll('.tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const slug = tile.dataset.slug;
+        const filtered = allProducts.filter(p => (p.category || '').toLowerCase() === slug.toLowerCase());
+        renderProducts(filtered);
+      });
+    });
+  }
+
+  async function loadHome() {
+    const catSnap = await getDocs(collection(db, 'categories')); // Read categories. [2]
+    const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderCategories(categories);
+
+    const q = query(collection(db, 'products'), limit(20));      // Read products. [2]
+    const prodSnap = await getDocs(q);
+    allProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderProducts(allProducts);
+  }
+
+  // Search
+  document.addEventListener('DOMContentLoaded', () => {
+    els.search().addEventListener('input', e => {
+      const q = e.target.value.trim().toLowerCase();
+      const filtered = allProducts.filter(p =>
+        p.title.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q)
+      );
+      renderProducts(filtered);
+    });
+  });
+
+  // Account modal
+  function openAccount() { els.accountModal().style.display = 'flex'; els.accountModal().setAttribute('aria-hidden','false'); }
+  function closeAccount() { els.accountModal().style.display = 'none'; els.accountModal().setAttribute('aria-hidden','true'); }
+  els.loginBtn().addEventListener('click', openAccount);
+  els.closeAccount().addEventListener('click', closeAccount);
+  els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); });
+
+  function setTab(name) {
+    const tabs = [els.tabLogin(), els.tabSignup(), els.tabProfile()];
+    const panels = [els.panelLogin(), els.panelSignup(), els.panelProfile()];
+    tabs.forEach(b => b.classList.remove('active'));
+    panels.forEach(p => p.classList.remove('active'));
+    if (name === 'login') { els.tabLogin().classList.add('active'); els.panelLogin().classList.add('active'); }
+    if (name === 'signup') { els.tabSignup().classList.add('active'); els.panelSignup().classList.add('active'); }
+    if (name === 'profile') { els.tabProfile().classList.add('active'); els.panelProfile().classList.add('active'); }
+  }
+  els.tabLogin().addEventListener('click', () => setTab('login'));
+  els.tabSignup().addEventListener('click', () => setTab('signup'));
+  els.tabProfile().addEventListener('click', () => setTab('profile'));
+  function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); }
+
+  els.formLogin().addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(els.formLogin());
+    const email = data.get('email'); const password = data.get('password');
+    try {
+      await signInWithEmailAndPassword(auth, email, password); // Sign in. [1]
+      showAlert('Logged in');
+      setTab('profile');
+    } catch (err) { showAlert(err.message); }
+  });
+  els.formSignup().addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(els.formSignup());
+    const name = (data.get('name') || '').toString();
+    const email = data.get('email'); const password = data.get('password');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password); // Create user. [1]
+      if (name) await updateProfile(cred.user, { displayName: name }); // Set name. [5]
+      showAlert('Account created');
+      setTab('profile');
+    } catch (err) { showAlert(err.message); }
+  });
+  els.doReset().addEventListener('click', async () => {
+    const email = (new FormData(els.formLogin()).get('email') || '').toString();
+    if (!email) { showAlert('Enter email in login form first'); return; }
+    try {
+      await sendPasswordResetEmail(auth, email); // Reset email. [1]
+      showAlert('Password reset email sent');
+    } catch (err) { showAlert(err.message); }
+  });
+  els.formProfile().addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(els.formProfile());
+    const displayName = (data.get('displayName') || '').toString() || null;
+    const photoURL = (data.get('photoURL') || '').toString() || null;
+    const user = auth.currentUser;
+    if (!user) { showAlert('Not signed in'); return; }
+    try {
+      await updateProfile(user, { displayName, photoURL }); // Update profile. [5]
+      showAlert('Profile updated');
+    } catch (err) { showAlert(err.message); }
+  });
+  els.doSignOut().addEventListener('click', async () => {
+    await signOut(auth); // Sign out. [1]
+    showAlert('Signed out');
+    setTab('login');
+    setAdmin(false);
+  });
+  onAuthStateChanged(auth, (user) => {
+    els.loginBtn().textContent = user ? (user.displayName || user.email || 'Account') : 'Login'; // Label. [1]
+    document.querySelector('#panelProfile [name="displayName"]').value = user?.displayName || '';
+    document.querySelector('#panelProfile [name="photoURL"]').value = user?.photoURL || '';
+  });
+
+  // EmailJS contact
+  window.addEventListener('load', () => {
+    const form = els.contactForm();
+    const btn = els.sendBtn();
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.classList.add('loading');
+      try {
+        await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); // sendForm. [3]
+        form.reset();
+        alert('Message sent!');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to send.');
+      } finally {
+        btn.classList.remove('loading');
+      }
+    });
+  });
+
+  // Cart drawer
+  function openCartDrawer() {
+    els.cartDrawer().style.transform = 'translateX(0)';
+    els.cartDrawer().setAttribute('aria-hidden', 'false');
+    els.cartBackdrop().style.display = 'block';
+  }
+  function closeCartDrawer() {
+    els.cartDrawer().style.transform = 'translateX(100%)';
+    els.cartDrawer().setAttribute('aria-hidden', 'true');
+    els.cartBackdrop().style.display = 'none';
+  }
+  function renderCart() {
+    if (cart.length === 0) {
+      els.cartItems().innerHTML = '<div class="cart-empty">Cart is empty.</div>';
+      els.cartSubtotal().textContent = '₹0';
+      return;
+    }
+    els.cartItems().innerHTML = cart.map(i => `
+      <div class="cart-item">
+        <img src="${i.imageUrl}" alt="${i.title}" />
+        <div>
+          <h4>${i.title}</h4>
+          <div class="meta">₹${i.price} × ${i.qty} = ₹${(Number(i.price)||0)*i.qty}</div>
+          <div class="qty">
+            <button data-id="${i.id}" class="qty-dec">−</button>
+            <span>${i.qty}</span>
+            <button data-id="${i.id}" class="qty-inc">+</button>
+            <button data-id="${i.id}" class="remove">Remove</button>
+          </div>
+        </div>
+        <strong>₹${(Number(i.price)||0)*i.qty}</strong>
+      </div>
+    `).join('');
+    els.cartSubtotal().textContent = `₹${cartSubtotalValue()}`;
+    els.cartItems().querySelectorAll('.qty-inc').forEach(b => b.addEventListener('click', () => incQty(b.dataset.id)));
+    els.cartItems().querySelectorAll('.qty-dec').forEach(b => b.addEventListener('click', () => decQty(b.dataset.id)));
+    els.cartItems().querySelectorAll('.remove').forEach(b => b.addEventListener('click', () => removeItem(b.dataset.id)));
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('openCart').addEventListener('click', openCartDrawer);
+    document.getElementById('closeCart').addEventListener('click', closeCartDrawer);
+    document.getElementById('cartBackdrop').addEventListener('click', closeCartDrawer);
+    document.getElementById('clearCart').addEventListener('click', clearCart);
+    document.getElementById('checkoutBtn').addEventListener('click', openCheckout);
+  });
+
+  // Admin session (client-side gate)
+  const ADMIN_SESSION_KEY = 'isAdmin';
+  function isAdmin() { return localStorage.getItem(ADMIN_SESSION_KEY) === 'true'; }
+  function setAdmin(v) { localStorage.setItem(ADMIN_SESSION_KEY, v ? 'true' : 'false'); syncAdminUI(); }
+  function openAdmin() { els.adminBackdrop().style.display = 'flex'; els.adminBackdrop().setAttribute('aria-hidden','false'); syncAdminUI(); }
+  function closeAdminModal() { els.adminBackdrop().style.display = 'none'; els.adminBackdrop().setAttribute('aria-hidden','true'); }
+  document.getElementById('adminBtn').addEventListener('click', openAdmin);
+  document.getElementById('closeAdmin').addEventListener('click', closeAdminModal);
+  document.getElementById('adminBackdrop').addEventListener('click', (e) => { if (e.target === els.adminBackdrop()) closeAdminModal(); });
+  function syncAdminUI() {
+    const unlocked = isAdmin();
+    els.adminState().textContent = unlocked ? 'Unlocked' : 'Locked';
+    els.adminState().style.color = unlocked ? '#0a7' : '#92400e';
+    els.productCard().style.display = unlocked ? '' : 'none';
+    els.categoryCard().style.display = unlocked ? '' : 'none';
+  }
+  els.unlockAdmin().addEventListener('click', () => {
+    const code = (els.adminCode().value || '').trim();
+    if (code === '741223') {
+      setAdmin(true); // Client-side only; secure with rules in prod. [6][7]
+      alert('Admin unlocked');
+    } else {
+      alert('Invalid code');
+    }
+  });
+  onAuthStateChanged(auth, (user) => { if (!user) setAdmin(false); });
+
+  // Admin: Add product
+  document.getElementById('formAddProduct').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!isAdmin()) { alert('Admin locked'); return; }
+    const fd = new FormData(e.currentTarget);
+    const data = {
+      title: (fd.get('title') || '').toString(),
+      price: Number(fd.get('price') || 0),
+      imageUrl: (fd.get('imageUrl') || '').toString(),
+      category: (fd.get('category') || '').toString(),
+      stock: parseInt(fd.get('stock') || '0', 10),
+      createdAt: Date.now(),
+    };
+    try {
+      await addDoc(collection(db, 'products'), data); // Write product. [2]
+      alert('Product added');
+      e.currentTarget.reset();
+      loadHome(); // Refresh. [2]
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add product');
+    }
+  });
+
+  // Admin: Add category
+  document.getElementById('formAddCategory').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!isAdmin()) { alert('Admin locked'); return; }
+    const fd = new FormData(e.currentTarget);
+    const data = {
+      name: (fd.get('name') || '').toString(),
+      slug: (fd.get('slug') || '').toString(),
+      imageUrl: (fd.get('imageUrl') || '').toString(),
+      createdAt: Date.now(),
+    };
+    try {
+      await addDoc(collection(db, 'categories'), data); // Write category. [2]
+      alert('Category added');
+      e.currentTarget.reset();
+      loadHome(); // Refresh. [2]
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add category');
+    }
+  });
+
+  // Checkout modal and order placement
+  function openCheckout() {
+    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // Auth gate. [1]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // Cart gate. [2]
+    els.checkoutForm().querySelector('[name="email"]').value = auth.currentUser.email || '';
+    const subtotal = cartSubtotalValue();
+    els.ckItemsCount().textContent = cart.reduce((s,i)=>s+(i.qty||0),0);
+    els.ckSubtotal().textContent = `₹${subtotal}`;
+    els.ckTotal().textContent = `₹${subtotal}`;
+    els.ckItemsList().innerHTML = cart.map(i => `${i.title} — ₹${i.price} × ${i.qty}`).join('<br/>');
+    els.checkoutBackdrop().style.display = 'flex';
+    els.checkoutBackdrop().setAttribute('aria-hidden','false');
+  }
+  function closeCheckoutModal() {
+    els.checkoutBackdrop().style.display = 'none';
+    els.checkoutBackdrop().setAttribute('aria-hidden','true');
+  }
+  els.closeCheckout().addEventListener('click', closeCheckoutModal);
+  els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); });
+
+  // Celebration helpers
+  function showCelebration(message) {
+    if (message) els.celebrateMsg().textContent = message;
+    els.celebrate().style.display = 'flex';
+    els.celebrate().setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+      // center burst
+      if (window.confetti) {
+        confetti({ particleCount: 120, startVelocity: 35, spread: 70, origin: { x: 0.5, y: 0.4 } });
+        confetti({ particleCount: 80, angle: 60, spread: 50, origin: { x: 0 } });
+        confetti({ particleCount: 80, angle: 120, spread: 50, origin: { x: 1 } });
+      }
+    }, 150);
+  }
+  function hideCelebration() {
+    els.celebrate().style.display = 'none';
+    els.celebrate().setAttribute('aria-hidden', 'true');
+  }
+  els.celebrateClose().addEventListener('click', hideCelebration);
+  els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); });
+
+  // Place order
+  els.checkoutForm().addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!auth.currentUser) { alert('Not signed in.'); return; } // Safety. [1]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // Safety. [2]
+
+    const fd = new FormData(els.checkoutForm());
+    const payload = {
+      userId: auth.currentUser.uid,
+      email: (fd.get('email') || '').toString(),
+      fullName: (fd.get('fullName') || '').toString(),
+      phone: (fd.get('phone') || '').toString(),
+      address: (fd.get('address') || '').toString(),
+      payment: (fd.get('payment') || '').toString(),
+      currency: 'INR',
+      items: cart.map(i => ({ id: i.id, title: i.title, price: Number(i.price)||0, qty: i.qty||0, imageUrl: i.imageUrl })),
+      subtotal: cartSubtotalValue(),
+      shipping: 0,
+      total: cartSubtotalValue(),
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    els.placeOrderBtn().classList.add('loading');
+
+    try {
+      const ref = await addDoc(collection(db, 'orders'), payload); // Create order. [8][2]
+      const orderId = ref.id;
+
+      // Optional: order email
+      try {
+        const itemsText = payload.items.map(i => `${i.title} x${i.qty} = ₹${i.price * i.qty}`).join('\n');
+        await emailjs.send('service_c4p68ag', 'template_214uijp', {
+          name: payload.fullName,
+          email: payload.email,
+          order_id: orderId,
+          items_text: itemsText,
+          total: `₹${payload.total}`,
+        }); // Email send. [9][10]
+      } catch (emailErr) {
+        console.warn('Email send failed (continuing):', emailErr);
+      }
+
+      // Clear cart and celebrate
+      cart = [];
+      localStorage.setItem('cart', JSON.stringify(cart));
+      updateCartBadge();
+      renderCart();
+      closeCheckoutModal();
+      showCelebration(`Order ID: ${orderId}`);
+
+    } catch (err) {
+      console.error(err);
+      alert('Failed to place order. Please try again.');
+    } finally {
+      els.placeOrderBtn().classList.remove('loading');
+    }
+  });
+
+  // Bootstrap
+  updateCartBadge();
+  renderCart();
+  loadHome(); // Load data. [2]
+</script>
+
+<!-- EmailJS SDK + init -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
+<script defer>
+  window.addEventListener('load', () => {
+    emailjs.init('E8cAV9p-pSYDnM8kE'); // EmailJS public key. [3]
+  });
+</script>
+<!-- Canvas Confetti CDN -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Shopsy</div>
+    <div class="search"><input id="search" placeholder="Search products..." /></div>
+    <nav>
+      <button id="loginBtn" class="btn">Login</button>
+      <button id="adminBtn" class="btn">Admin</button>
+      <button id="openCart" class="btn cart-toggle">Cart <span id="cartCount" class="badge">0</span></button>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Big Savings, Daily</h1>
+    <p>Discover deals across fashion, electronics, and more.</p>
+  </section>
+
+  <section>
+    <h2 style="padding:0 16px;margin:16px 0 0">Categories</h2>
+    <div id="categoryGrid" class="grid"></div>
+  </section>
+
+  <section>
+    <h2 style="padding:0 16px;margin:16px 0 0">Featured</h2>
+    <div id="productGrid" class="grid"></div>
+  </section>
+
+  <section class="contact">
+    <h2>Contact</h2>
+    <form id="contactForm">
+      <input name="from_name" placeholder="Name" required />
+      <input name="reply_to" type="email" placeholder="Email" required />
+      <textarea name="message" placeholder="Message" required></textarea>
+      <button id="sendBtn" class="btn primary" type="submit">
+        <span class="txt">Send</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+    </form>
+  </section>
+
+  <!-- Account Modal -->
+  <div id="accountModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+      <header>
+        <h3>Account</h3>
+        <button class="close" aria-label="Close" id="closeAccount">×</button>
+      </header>
+
+      <div class="tabs">
+        <button id="tabLogin" class="active">Log in</button>
+        <button id="tabSignup">Sign up</button>
+        <button id="tabProfile">Profile</button>
+      </div>
+
+      <div id="alertBox" class="alert"></div>
+
+      <section id="panelLogin" class="panel active">
+        <form id="formLogin" class="row">
+          <input name="email" type="email" placeholder="Email" required />
+          <input name="password" type="password" placeholder="Password" required />
+          <button class="btn primary" type="submit">Log in</button>
+        </form>
+        <button id="doReset" class="btn" type="button">Forgot password?</button>
+      </section>
+
+      <section id="panelSignup" class="panel">
+        <form id="formSignup" class="row">
+          <input name="name" placeholder="Full name" />
+          <input name="email" type="email" placeholder="Email" required />
+          <input name="password" type="password" placeholder="Password (6+)" required />
+          <button class="btn primary" type="submit">Create account</button>
+        </form>
+        <p class="muted">By continuing, an account will be created with email/password authentication.</p>
+      </section>
+
+      <section id="panelProfile" class="panel">
+        <form id="formProfile" class="row">
+          <input name="displayName" placeholder="Display name" />
+          <input name="photoURL" type="url" placeholder="Photo URL (https://...)" />
+          <button class="btn primary" type="submit">Save profile</button>
+        </form>
+        <button id="doSignOut" class="btn" type="button">Sign out</button>
+      </section>
+    </div>
+  </div>
+
+  <!-- Cart Drawer -->
+  <div id="cartDrawer" class="cart-drawer" aria-hidden="true">
+    <div class="cart-header">
+      <strong>Cart</strong>
+      <button id="closeCart" class="btn">Close</button>
+    </div>
+    <div id="cartItems" class="cart-items"></div>
+    <div class="cart-footer">
+      <div class="cart-row">
+        <span>Subtotal</span>
+        <strong id="cartSubtotal">₹0</strong>
+      </div>
+      <div class="cart-actions">
+        <button id="clearCart" class="btn">Clear</button>
+        <button id="checkoutBtn" class="btn primary" style="flex:1">Checkout</button>
+      </div>
+    </div>
+  </div>
+  <div id="cartBackdrop" class="cart-drawer-backdrop"></div>
+
+  <!-- Admin Modal -->
+  <div id="adminBackdrop" class="admin-backdrop" aria-hidden="true">
+    <div class="admin-modal">
+      <header>
+        <h3>Admin</h3>
+        <button id="closeAdmin" class="close" aria-label="Close">×</button>
+      </header>
+      <div class="admin-body">
+        <div class="admin-card" id="adminGateCard">
+          <h4>Unlock Admin</h4>
+          <div class="admin-gate">
+            <input id="adminCode" placeholder="Enter admin code" />
+            <button id="unlockAdmin" class="btn primary">Unlock</button>
+            <span id="adminState" class="admin-badge">Locked</span>
+          </div>
+          <p class="muted">Client-side gate only; use Firestore Rules + custom claims to secure writes in production.</p>
+        </div>
+
+        <div class="admin-card" id="productCard" style="display:none">
+          <h4>Add Product</h4>
+          <form id="formAddProduct" class="row">
+            <input name="title" placeholder="Title" required />
+            <input name="price" type="number" step="0.01" placeholder="Price" required />
+            <input name="imageUrl" type="url" placeholder="Image URL" required />
+            <input name="category" placeholder="Category slug (e.g., fashion)" required />
+            <input name="stock" type="number" step="1" placeholder="Stock (e.g., 20)" required />
+            <button class="btn primary" type="submit">Add product</button>
+          </form>
+        </div>
+
+        <div class="admin-card" id="categoryCard" style="display:none">
+          <h4>Add Category</h4>
+          <form id="formAddCategory" class="row">
+            <input name="name" placeholder="Name (e.g., Fashion)" required />
+            <input name="slug" placeholder="Slug (e.g., fashion)" required />
+            <input name="imageUrl" type="url" placeholder="Image URL" required />
+            <button class="btn primary" type="submit">Add category</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutBackdrop" class="checkout-backdrop" aria-hidden="true">
+    <div class="checkout-modal">
+      <header>
+        <h3>Checkout</h3>
+        <button id="closeCheckout" class="close" aria-label="Close">×</button>
+      </header>
+      <div class="checkout-body">
+        <form id="checkoutForm" class="ck-row">
+          <input name="fullName" placeholder="Full name" required />
+          <input name="email" type="email" placeholder="Email for updates" required />
+          <input name="phone" type="tel" placeholder="Phone" required />
+          <textarea name="address" placeholder="Shipping address" rows="4" required></textarea>
+          <select name="payment" required>
+            <option value="cod">Cash on Delivery</option>
+          </select>
+          <button id="placeOrderBtn" class="btn primary" type="submit">
+            <span class="txt">Place order</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <div class="summary">
+          <h4>Order summary</h4>
+          <div class="line"><span>Items</span><strong id="ckItemsCount">0</strong></div>
+          <div class="line"><span>Subtotal</span><strong id="ckSubtotal">₹0</strong></div>
+          <div class="line"><span>Shipping</span><strong>₹0</strong></div>
+          <div class="line"><span>Total</span><strong id="ckTotal">₹0</strong></div>
+          <div id="ckItemsList" class="items"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Celebration Overlay -->
+  <div id="celebrate" class="celebrate-backdrop" aria-hidden="true">
+    <div class="celebrate-card">
+      <div class="checkwrap" aria-hidden="true">
+        <svg viewBox="0 0 120 120">
+          <circle class="check-circle" cx="60" cy="60" r="50"></circle>
+          <polyline class="check-mark" points="38,62 54,78 84,46"></polyline>
+        </svg>
+      </div>
+      <div class="celebrate-title">Order placed!</div>
+      <div id="celebrateMsg" class="celebrate-sub">Thanks for the purchase.</div>
+      <div style="margin-top:14px">
+        <button id="celebrateClose" class="btn primary">Continue shopping</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>© 2025 Shopsy demo</footer>
+</body>
+</html>
