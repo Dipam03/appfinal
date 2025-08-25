@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Shopsy Home (Profile + Orders + Wishlist + Dark Theme)</title>
+<title>Shopsy Home (Working Orders)</title>
 <style>
   :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); --bg:#fff; --fg:#111; --card:#fff; --border:#eee; --mutetext:#666; }
   [data-theme="dark"] { --bg:#0b0f14; --fg:#e6eef7; --card:#10161d; --border:#1f2a35; --mutetext:#a5b2c1; --glow:rgba(0,102,255,.35); }
@@ -47,16 +47,7 @@
   .contact form { display:grid; gap:10px; max-width:420px; }
   input, textarea { padding:10px 12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:var(--card); color:var(--fg); }
 
-  .btn .spinner {
-    --sz:16px;
-    width:var(--sz); height:var(--sz);
-    border-radius:50%;
-    border:2px solid rgba(255,255,255,.6);
-    border-top-color:#fff;
-    margin-left:8px;
-    display:none;
-    animation:spin 1s linear infinite;
-  }
+  .btn .spinner { --sz:16px; width:var(--sz); height:var(--sz); border-radius:50%; border:2px solid rgba(255,255,255,.6); border-top-color:#fff; margin-left:8px; display:none; animation:spin 1s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .btn.loading span.txt { opacity:.6; }
   .btn.loading .spinner { display:inline-block; }
@@ -126,7 +117,7 @@
   /* Orders */
   .order-card { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
   .order-line { display:flex; justify-content:space-between; margin:4px 0; font-size:14px; }
-  .order-items { margin-top:8px; font-size:13px; color:var(--mutetext); white-space:pre-line; }
+  .order-items { margin-top:8px; font-size:13px; color:var(--mutetext); white-space:pre-line; display:none; }
 
   /* Celebration overlay */
   .celebrate-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:2000; }
@@ -156,9 +147,9 @@
     measurementId: "G-KY618BJER7",
   };
 
-  const app = initializeApp(firebaseConfig); // Firebase init. [1]
-  const auth = getAuth(app);                 // Auth. [1]
-  const db = getFirestore(app);              // Firestore. [2]
+  const app = initializeApp(firebaseConfig); // Firebase init. [12]
+  const auth = getAuth(app);                 // Auth. [12]
+  const db = getFirestore(app);              // Firestore. [3]
 
   // Elements
   const els = {
@@ -233,14 +224,14 @@
   };
 
   // Theme
-  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // [5]
-  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // [5]
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // [1]
+  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // [1]
   document.addEventListener('DOMContentLoaded', initTheme);
   els.themeToggle().addEventListener('change', () => {
     const t = els.themeToggle().checked ? 'dark' : 'light';
     localStorage.setItem('theme', t);
     applyTheme(t);
-  }); // [5]
+  }); // [1]
 
   // State
   let allProducts = [];
@@ -252,9 +243,9 @@
     const n = cart.reduce((s, i) => s + i.qty, 0);
     const badge = els.cartCount();
     badge.textContent = n;
-    badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); // [2]
+    badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); // [1]
   }
-  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // [2]
+  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // [1]
   function addToCart(id) {
     const item = allProducts.find(p => p.id === id); if (!item) return;
     const existing = cart.find(c => c.id === id);
@@ -282,7 +273,7 @@
         </div>
       </div>
     `;
-  } // [2]
+  } // [3]
 
   function renderProducts(list) {
     els.productGrid().innerHTML = list.map(p => cardTemplate(p, wishlist.has(p.id))).join('');
@@ -296,7 +287,7 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // [2]
+  } // [3]
 
   function renderCategories(list) {
     els.categoryGrid().innerHTML = list.map(c => `
@@ -312,12 +303,12 @@
         renderProducts(filtered);
       });
     });
-  } // [2]
+  } // [3]
 
   async function loadHome() {
-    const catSnap = await getDocs(collection(db, 'categories')); // [2]
+    const catSnap = await getDocs(collection(db, 'categories')); // [3]
     renderCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    const qref = query(collection(db, 'products'), limit(20));   // [2]
+    const qref = query(collection(db, 'products'), limit(20));   // [3]
     const prodSnap = await getDocs(qref);
     allProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderProducts(allProducts);
@@ -360,6 +351,32 @@
 
   function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); }
 
+  // Hide/show Login & Sign up tabs on auth
+  function hideAuthTabs() {
+    const tLogin = els.tabLogin && els.tabLogin();
+    const tSignup = els.tabSignup && els.tabSignup();
+    const pLogin = els.panelLogin && els.panelLogin();
+    const pSignup = els.panelSignup && els.panelSignup();
+    if (tLogin) tLogin.style.display = 'none';
+    if (tSignup) tSignup.style.display = 'none';
+    if (pLogin) pLogin.style.display = 'none';
+    if (pSignup) pSignup.style.display = 'none';
+    const activeLogin = tLogin && tLogin.classList.contains('active');
+    const activeSignup = tSignup && tSignup.classList.contains('active');
+    if (activeLogin || activeSignup) setTab('profile'); // [3]
+  }
+  function showAuthTabs() {
+    const tLogin = els.tabLogin && els.tabLogin();
+    const tSignup = els.tabSignup && els.tabSignup();
+    const pLogin = els.panelLogin && els.panelLogin();
+    const pSignup = els.panelSignup && els.panelSignup();
+    if (tLogin) tLogin.style.display = '';
+    if (tSignup) tSignup.style.display = '';
+    if (pLogin) pLogin.style.display = '';
+    if (pSignup) pSignup.style.display = '';
+    setTab('login'); // [3]
+  }
+
   // Firestore user profile upsert
   async function upsertUserProfile(user) {
     if (!user) return;
@@ -386,7 +403,7 @@
     const data = new FormData(els.formLogin());
     const email = data.get('email'); const password = data.get('password');
     try {
-      await signInWithEmailAndPassword(auth, email, password); // [1]
+      await signInWithEmailAndPassword(auth, email, password); // [12]
       await upsertUserProfile(auth.currentUser);               // [3]
       openProfile();
       showAlert('Logged in');
@@ -399,7 +416,7 @@
     const name = (data.get('name') || '').toString();
     const email = data.get('email'); const password = data.get('password');
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password); // [1]
+      const cred = await createUserWithEmailAndPassword(auth, email, password); // [12]
       if (name) await updateProfile(cred.user, { displayName: name });         // [3]
       await upsertUserProfile(cred.user);                                      // [3]
       openProfile();
@@ -410,7 +427,7 @@
   els.doReset().addEventListener('click', async () => {
     const email = (new FormData(els.formLogin()).get('email') || '').toString();
     if (!email) { showAlert('Enter email in login form first'); return; }
-    try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); } // [1]
+    try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); } // [12]
   });
 
   els.formProfile().addEventListener('submit', async (e) => {
@@ -430,15 +447,15 @@
   });
 
   els.doSignOut().addEventListener('click', async () => {
-    await signOut(auth); showAlert('Signed out'); setTab('login'); setAdmin(false); // [1]
+    await signOut(auth); showAlert('Signed out'); showAuthTabs(); setTab('login'); setAdmin(false); // [12][3]
   });
 
   // Wishlist
-  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // [2]
+  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // [3]
   async function loadMyWishlist() {
     const col = userWishlistCol(); if (!col) { wishlist = new Set(); renderWishlistPanel(); return; }
     const snap = await getDocs(col); wishlist = new Set(snap.docs.map(d => d.id)); renderWishlistPanel();
-  } // [2]
+  } // [3]
   async function toggleWishlist(productId, productData) {
     const col = userWishlistCol(); if (!col) { alert('Sign in to use wishlist'); return; }
     const ref = doc(db, 'users', auth.currentUser.uid, 'wishlist', productId);
@@ -448,7 +465,7 @@
       wishlist.add(productId);
     }
     renderProducts(allProducts); renderWishlistPanel();
-  } // [2]
+  } // [3]
   function renderWishlistPanel() {
     const items = allProducts.filter(p => wishlist.has(p.id));
     els.wishlistList().innerHTML = items.length ? items.map(p => cardTemplate(p, true)).join('') : '<div class="muted">No items in wishlist.</div>';
@@ -462,29 +479,67 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // [2]
+  } // [3]
 
-  // Orders
+  // Orders: robust loader with details and error handling
   async function loadMyOrders() {
-    if (!auth.currentUser) { els.ordersList().innerHTML = '<div class="muted">Sign in to see orders.</div>'; return; }
-    const qref = query(collection(db, 'orders'), where('userId','==',auth.currentUser.uid), orderBy('createdAt','desc')); // [2]
-    const snap = await getDocs(qref);
-    if (snap.empty) { els.ordersList().innerHTML = '<div class="muted">No orders yet.</div>'; return; }
-    els.ordersList().innerHTML = snap.docs.map(d => {
-      const o = d.data();
-      const itemsText = (o.items||[]).map(i => `${i.title} x${i.qty} = ₹${(Number(i.price)||0)*(i.qty||0)}`).join('\n');
-      return `
-        <div class="order-card">
-          <div class="order-line"><span>Order ID</span><strong>${d.id}</strong></div>
-          <div class="order-line"><span>Status</span><strong>${o.status||'pending'}</strong></div>
-          <div class="order-line"><span>Total</span><strong>₹${o.total||o.subtotal||0}</strong></div>
-          <div class="order-items">${itemsText}</div>
-        </div>
-      `;
-    }).join('');
-  } // [2]
+    const listEl = els.ordersList();
+    if (!auth.currentUser) {
+      listEl.innerHTML = '<div class="muted">Sign in to see orders.</div>';
+      return;
+    }
+    listEl.innerHTML = '<div class="muted">Loading orders…</div>';
+    try {
+      const qref = query(
+        collection(db, 'orders'),
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('createdAt', 'desc')
+      ); // Requires composite index if prompted. [3][1]
+      const snap = await getDocs(qref);
+      if (snap.empty) {
+        listEl.innerHTML = '<div class="muted">No orders yet.</div>';
+        return;
+      }
+      listEl.innerHTML = snap.docs.map(d => {
+        const o = d.data();
+        const createdAt =
+          (o.createdAt && o.createdAt.toDate && o.createdAt.toDate()) ?
+            o.createdAt.toDate().toLocaleString() : '';
+        const items = Array.isArray(o.items) ? o.items : [];
+        const itemsText = items.map(i =>
+          `${i.title} × ${i.qty} = ₹${(Number(i.price)||0) * (i.qty||0)}`
+        ).join('\n');
+        return `
+          <div class="order-card" data-id="${d.id}">
+            <div class="order-line"><span>Order ID</span><strong>${d.id}</strong></div>
+            <div class="order-line"><span>Date</span><strong>${createdAt}</strong></div>
+            <div class="order-line"><span>Status</span><strong>${o.status || 'pending'}</strong></div>
+            <div class="order-line"><span>Total</span><strong>₹${o.total ?? o.subtotal ?? 0}</strong></div>
+            <div class="order-items">${itemsText}</div>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn toggle-items">View details</button>
+              <button class="btn" onclick="navigator.clipboard && navigator.clipboard.writeText('${d.id}')">Copy ID</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      // Wire expand/collapse
+      listEl.querySelectorAll('.order-card .toggle-items').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const card = e.target.closest('.order-card');
+          const details = card.querySelector('.order-items');
+          const show = details.style.display !== 'block';
+          details.style.display = show ? 'block' : 'none';
+          btn.textContent = show ? 'Hide details' : 'View details';
+        });
+      });
+    } catch (err) {
+      console.error(err);
+      listEl.innerHTML = '<div class="muted">Failed to load orders. Please try again.</div>';
+    }
+  } // [3][1]
 
-  // Auth listener: toggle header, pill, wishlist
+  // Auth listener: toggle header, pill, wishlist, and auth tabs
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       await upsertUserProfile(user);                       // [3]
@@ -492,12 +547,14 @@
       els.adminBtn().style.display = 'none';
       els.myProfileBtn().style.display = '';
       updateUserPill(user);                                // [3]
-      await loadMyWishlist();                              // [2]
+      await loadMyWishlist();                              // [3]
+      hideAuthTabs();                                      // [3]
     } else {
       els.loginBtn().style.display = '';
       els.adminBtn().style.display = '';
       els.myProfileBtn().style.display = 'none';
-      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts); // [3][2]
+      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts); // [3]
+      showAuthTabs();                                      // [3]
     }
   });
 
@@ -506,7 +563,7 @@
     const form = els.contactForm(); const btn = els.sendBtn();
     form.addEventListener('submit', async (e) => {
       e.preventDefault(); btn.classList.add('loading');
-      try { await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); form.reset(); alert('Message sent!'); } // [4]
+      try { await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); form.reset(); alert('Message sent!'); } // [11]
       catch (err) { console.error(err); alert('Failed to send.'); }
       finally { btn.classList.remove('loading'); }
     });
@@ -572,7 +629,7 @@
     e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
     const fd = new FormData(e.currentTarget);
     const data = { title: (fd.get('title')||'').toString(), price: Number(fd.get('price')||0), imageUrl: (fd.get('imageUrl')||'').toString(), category: (fd.get('category')||'').toString(), stock: parseInt(fd.get('stock')||'0',10), createdAt: Date.now() };
-    try { await addDoc(collection(db,'products'), data); alert('Product added'); e.currentTarget.reset(); loadHome(); } // [2]
+    try { await addDoc(collection(db,'products'), data); alert('Product added'); e.currentTarget.reset(); loadHome(); } // [3]
     catch (err) { console.error(err); alert('Failed to add product'); }
   });
 
@@ -581,14 +638,14 @@
     e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
     const fd = new FormData(e.currentTarget);
     const data = { name:(fd.get('name')||'').toString(), slug:(fd.get('slug')||'').toString(), imageUrl:(fd.get('imageUrl')||'').toString(), createdAt: Date.now() };
-    try { await addDoc(collection(db,'categories'), data); alert('Category added'); e.currentTarget.reset(); loadHome(); } // [2]
+    try { await addDoc(collection(db,'categories'), data); alert('Category added'); e.currentTarget.reset(); loadHome(); } // [3]
     catch (err) { console.error(err); alert('Failed to add category'); }
   });
 
   // Checkout modal and order placement
   function openCheckout() {
-    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // [1]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }          // [2]
+    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // [12]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }          // [3]
     els.checkoutForm().querySelector('[name="email"]').value = auth.currentUser.email || '';
     const subtotal = cartSubtotalValue();
     els.ckItemsCount().textContent = cart.reduce((s,i)=>s+(i.qty||0),0);
@@ -618,8 +675,8 @@
   // Place order
   els.checkoutForm().addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!auth.currentUser) { alert('Not signed in.'); return; } // [1]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // [2]
+    if (!auth.currentUser) { alert('Not signed in.'); return; } // [12]
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // [3]
 
     const fd = new FormData(els.checkoutForm());
     const payload = {
@@ -642,25 +699,27 @@
     els.placeOrderBtn().classList.add('loading');
 
     try {
-      const ref = await addDoc(collection(db, 'orders'), payload); // [2]
+      const ref = await addDoc(collection(db, 'orders'), payload); // [3]
       const orderId = ref.id;
       try {
         const itemsText = payload.items.map(i => `${i.title} x${i.qty} = ₹${i.price * i.qty}`).join('\n');
-        await emailjs.send('service_c4p68ag', 'template_214uijp', { name: payload.fullName, email: payload.email, order_id: orderId, items_text: itemsText, total: `₹${payload.total}` }); // [4]
+        await emailjs.send('service_c4p68ag', 'template_214uijp', { name: payload.fullName, email: payload.email, order_id: orderId, items_text: itemsText, total: `₹${payload.total}` }); // [11]
       } catch (emailErr) { console.warn('Email send failed (continuing):', emailErr); }
       cart = []; localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); closeCheckoutModal(); showCelebration(`Order ID: ${orderId}`);
+      // Prefetch orders so the Orders tab is ready
+      loadMyOrders(); // [13]
     } catch (err) { console.error(err); alert('Failed to place order. Please try again.'); }
     finally { els.placeOrderBtn().classList.remove('loading'); }
   });
 
   // Bootstrap
-  updateCartBadge(); renderCart(); loadHome(); // [2]
+  updateCartBadge(); renderCart(); loadHome(); // [3]
 </script>
 
 <!-- EmailJS SDK + init -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
 <script defer>
-  window.addEventListener('load', () => { emailjs.init('E8cAV9p-pSYDnM8kE'); }); /* EmailJS public key */ <!-- [4] -->
+  window.addEventListener('load', () => { emailjs.init('E8cAV9p-pSYDnM8kE'); }); /* EmailJS public key */ <!-- [11] -->
 </script>
 <!-- Canvas Confetti CDN -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js" defer></script>
