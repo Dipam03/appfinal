@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Crodyto Home (UPI + Full App)</title>
+<title>Crodyto Home (Full Featured E-commerce App)</title>
 <style>
   :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); --bg:#fff; --fg:#111; --card:#fff; --border:#eee; --mutetext:#666; }
   [data-theme="dark"] { --bg:#0b0f14; --fg:#e6eef7; --card:#10161d; --border:#1f2a35; --mutetext:#a5b2c1; --glow:rgba(0,102,255,.35); }
@@ -136,7 +136,7 @@
   import { getFirestore, collection, getDocs, query, limit, addDoc, serverTimestamp, doc, setDoc, getDoc, deleteDoc, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
   import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
-  // Firebase config (provided)
+  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyC5MGkOf5_0cF-xQrcA1PBSSvq6Y-AarSc",
     authDomain: "ds-mart-888d2.firebaseapp.com",
@@ -147,10 +147,15 @@
     measurementId: "G-KY618BJER7",
   };
 
-  const app = initializeApp(firebaseConfig); // Firebase init. [3]
-  const auth = getAuth(app);                 // Auth. [3]
-  const db = getFirestore(app);              // Firestore. [3]
-  const storage = getStorage(app);           // Storage. [4]
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  // UPI configuration (set a valid business VPA)
+  const UPI_VPA = 'example@upi';           // TODO: replace with real VPA
+  const UPI_NAME = 'Crodyto';
+  const UPI_NOTE_PREFIX = 'Crodyto Order';
 
   // Elements
   const els = {
@@ -204,8 +209,6 @@
     adminState: () => document.getElementById('adminState'),
     productCard: () => document.getElementById('productCard'),
     categoryCard: () => document.getElementById('categoryCard'),
-    formAddProduct: () => document.getElementById('formAddProduct'),
-    formAddCategory: () => document.getElementById('formAddCategory'),
 
     // Upload controls
     prodImageFile: () => document.getElementById('prodImageFile'),
@@ -245,24 +248,19 @@
   };
 
   // Theme
-  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // Modern browsers. [3]
-  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // Persist theme. [3]
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); }
+  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); }
   document.addEventListener('DOMContentLoaded', initTheme);
   els.themeToggle().addEventListener('change', () => {
     const t = els.themeToggle().checked ? 'dark' : 'light';
     localStorage.setItem('theme', t);
     applyTheme(t);
-  }); // Toggle theme. [3]
+  });
 
   // State
   let allProducts = [];
   let cart = JSON.parse(localStorage.getItem('cart') || '[]');
   let wishlist = new Set();
-
-  // UPI configuration (set a valid business VPA)
-  const UPI_VPA = 'example@upi';           // TODO: replace with real VPA. [1]
-  const UPI_NAME = 'Crodyto';              // Payee name. [1]
-  const UPI_NOTE_PREFIX = 'Crodyto Order'; // Note prefix. [1]
 
   // Cart helpers
   function updateCartBadge() {
@@ -270,19 +268,19 @@
     const badge = els.cartCount();
     badge.textContent = n;
     badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse');
-  } // Badge animation. [3]
-  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // Persist cart. [3]
+  }
+  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); }
   function addToCart(id) {
     const item = allProducts.find(p => p.id === id); if (!item) return;
     const existing = cart.find(c => c.id === id);
     if (existing) existing.qty += 1; else cart.push({ id: item.id, title: item.title, price: Number(item.price) || 0, imageUrl: item.imageUrl, qty: 1 });
     cartSave();
-  } // Add item. [3]
-  function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); } // Inc qty. [3]
-  function decQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty = Math.max(0, it.qty - 1); if (it.qty === 0) cart = cart.filter(i => i.id !== id); cartSave(); } // Dec qty. [3]
-  function removeItem(id) { cart = cart.filter(i => i.id !== id); cartSave(); } // Remove item. [3]
-  function clearCart() { cart = []; cartSave(); } // Clear cart. [3]
-  function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); } // Subtotal. [3]
+  }
+  function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); }
+  function decQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty = Math.max(0, it.qty - 1); if (it.qty === 0) cart = cart.filter(i => i.id !== id); cartSave(); }
+  function removeItem(id) { cart = cart.filter(i => i.id !== id); cartSave(); }
+  function clearCart() { cart = []; cartSave(); }
+  function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); }
 
   // Product card
   function cardTemplate(p, wished) {
@@ -299,7 +297,7 @@
         </div>
       </div>
     `;
-  } // Product card with wishlist heart. [3]
+  }
 
   function renderProducts(list) {
     els.productGrid().innerHTML = list.map(p => cardTemplate(p, wishlist.has(p.id))).join('');
@@ -313,7 +311,7 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // Wire product actions. [3]
+  }
 
   function renderCategories(list) {
     els.categoryGrid().innerHTML = list.map(c => `
@@ -329,7 +327,7 @@
         renderProducts(filtered);
       });
     });
-  } // Category filter. [3]
+  }
 
   async function loadHome() {
     const catSnap = await getDocs(collection(db, 'categories'));
@@ -338,7 +336,7 @@
     const prodSnap = await getDocs(qref);
     allProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderProducts(allProducts);
-  } // Fetch products/categories. [3]
+  }
 
   // Search
   document.addEventListener('DOMContentLoaded', () => {
@@ -347,14 +345,14 @@
       const filtered = allProducts.filter(p => p.title.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
       renderProducts(filtered);
     });
-  }); // Simple search. [3]
+  });
 
   // Account modal
   function openAccount() { els.accountModal().style.display = 'flex'; els.accountModal().setAttribute('aria-hidden','false'); }
   function closeAccount() { els.accountModal().style.display = 'none'; els.accountModal().setAttribute('aria-hidden','true'); }
   els.loginBtn().addEventListener('click', openAccount);
   els.closeAccount().addEventListener('click', closeAccount);
-  els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); }); // Modal control. [3]
+  els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); });
 
   // Tabs
   function setTab(name) {
@@ -366,16 +364,19 @@
     const pmap = { login:'panelLogin', signup:'panelSignup', profile:'panelProfile', orders:'panelOrders', wishlist:'panelWishlist' };
     const tb = els[map[name]] && els[map[name]](); const pn = els[pmap[name]] && els[pmap[name]]();
     if (tb) tb.classList.add('active'); if (pn) pn.classList.add('active');
-  } // Tab switcher. [3]
-  function openProfile() { openAccount(); setTab('profile'); } // Open profile. [3]
+  }
+  function openProfile() { openAccount(); setTab('profile'); }
   document.addEventListener('DOMContentLoaded', () => {
+    els.tabLogin() && els.tabLogin().addEventListener('click', () => setTab('login'));
+    els.tabSignup() && els.tabSignup().addEventListener('click', () => setTab('signup'));
+    els.tabProfile() && els.tabProfile().addEventListener('click', () => setTab('profile'));
     els.tabOrders() && els.tabOrders().addEventListener('click', () => { setTab('orders'); loadMyOrders(); });
     els.tabWishlist() && els.tabWishlist().addEventListener('click', () => { setTab('wishlist'); loadMyWishlist(); });
     els.myProfileBtn() && els.myProfileBtn().addEventListener('click', openProfile);
     els.openWishlist() && els.openWishlist().addEventListener('click', () => { openAccount(); setTab('wishlist'); loadMyWishlist(); });
-  }); // Account navigation. [3]
+  });
 
-  function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); } // Alerts. [3]
+  function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); }
 
   // Hide/show Login & Sign up tabs on auth
   function hideAuthTabs() {
@@ -390,7 +391,7 @@
     const activeLogin = tLogin && tLogin.classList.contains('active');
     const activeSignup = tSignup && tSignup.classList.contains('active');
     if (activeLogin || activeSignup) setTab('profile');
-  } // Hide auth tabs. [3]
+  }
   function showAuthTabs() {
     const tLogin = els.tabLogin && els.tabLogin();
     const tSignup = els.tabSignup && els.tabSignup();
@@ -401,7 +402,7 @@
     if (pLogin) pLogin.style.display = '';
     if (pSignup) pSignup.style.display = '';
     setTab('login');
-  } // Show auth tabs. [3]
+  }
 
   // Firestore user profile upsert
   async function upsertUserProfile(user) {
@@ -410,7 +411,7 @@
     const snap = await getDoc(ref);
     const base = { uid: user.uid, email: user.email || null, displayName: user.displayName || null, photoURL: user.photoURL || null, updatedAt: serverTimestamp() };
     if (!snap.exists()) await setDoc(ref, { ...base, createdAt: serverTimestamp() }); else await setDoc(ref, base, { merge: true });
-  } // Upsert user doc. [3]
+  }
 
   // Header user pill
   function updateUserPill(user) {
@@ -421,40 +422,82 @@
     const ph = user.photoURL || 'https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=' + encodeURIComponent(name);
     els.userAvatar().src = ph;
     els.userPill().onclick = () => { openAccount(); setTab('profile'); };
-  } // Pill setup. [3]
+  }
 
   // Auth flows
   els.formLogin().addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = new FormData(els.formLogin());
-    const email = data.get('email'); const password = data.get('password');
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.classList.add('loading');
     try {
+      const data = new FormData(els.formLogin());
+      const email = data.get('email'); const password = data.get('password');
       await signInWithEmailAndPassword(auth, email, password);
       await upsertUserProfile(auth.currentUser);
       openProfile();
-      showAlert('Logged in');
-    } catch (err) { showAlert(err.message); }
-  }); // Login. [3]
+      showAlert('Logged in successfully');
+    } catch (err) {
+      console.error('Login error:', err);
+      showAlert(err.message || 'Login failed');
+    } finally {
+      btn.classList.remove('loading');
+    }
+  });
 
   els.formSignup().addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = new FormData(els.formSignup());
-    const name = (data.get('name') || '').toString();
-    const email = data.get('email'); const password = data.get('password');
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.classList.add('loading');
     try {
+      const data = new FormData(els.formSignup());
+      const name = (data.get('name') || '').toString().trim();
+      const email = data.get('email'); 
+      const password = data.get('password');
+      
+      // Create user account
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      if (name) await updateProfile(cred.user, { displayName: name });
-      await upsertUserProfile(cred.user);
+      
+      // Set display name if provided
+      if (name) {
+        await updateProfile(cred.user, { displayName: name });
+      }
+      
+      // Create/update user profile in Firestore
+      await upsertUserProfile({
+        ...cred.user,
+        displayName: name || null
+      });
+      
+      // Update UI and show success
       openProfile();
-      showAlert('Account created');
-    } catch (err) { showAlert(err.message); }
-  }); // Signup. [3]
+      showAlert('Account created successfully');
+      
+      // Clear form
+      els.formSignup().reset();
+      
+    } catch (err) {
+      console.error('Signup error:', err);
+      let errorMessage = 'Account creation failed';
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'Email is already registered. Please use a different email or sign in.';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters long.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+      }
+      showAlert(errorMessage);
+    } finally {
+      btn.classList.remove('loading');
+    }
+  });
 
   els.doReset().addEventListener('click', async () => {
     const email = (new FormData(els.formLogin()).get('email') || '').toString();
     if (!email) { showAlert('Enter email in login form first'); return; }
     try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); }
-  }); // Reset. [3]
+  });
 
   els.formProfile().addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -470,18 +513,18 @@
       updateUserPill({ ...user, displayName, photoURL });
       showAlert('Profile updated');
     } catch (err) { showAlert(err.message); }
-  }); // Profile save. [3]
+  });
 
   els.doSignOut().addEventListener('click', async () => {
     await signOut(auth); showAlert('Signed out'); showAuthTabs(); setTab('login'); setAdmin(false);
-  }); // Sign out. [3]
+  });
 
   // Wishlist
-  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // Path. [3]
+  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); }
   async function loadMyWishlist() {
     const col = userWishlistCol(); if (!col) { wishlist = new Set(); renderWishlistPanel(); return; }
     const snap = await getDocs(col); wishlist = new Set(snap.docs.map(d => d.id)); renderWishlistPanel();
-  } // Load wishlist. [3]
+  }
   async function toggleWishlist(productId, productData) {
     const col = userWishlistCol(); if (!col) { alert('Sign in to use wishlist'); return; }
     const ref = doc(db, 'users', auth.currentUser.uid, 'wishlist', productId);
@@ -491,7 +534,7 @@
       wishlist.add(productId);
     }
     renderProducts(allProducts); renderWishlistPanel();
-  } // Toggle heart. [3]
+  }
   function renderWishlistPanel() {
     const items = allProducts.filter(p => wishlist.has(p.id));
     els.wishlistList().innerHTML = items.length ? items.map(p => cardTemplate(p, true)).join('') : '<div class="muted">No items in wishlist.</div>';
@@ -505,7 +548,7 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // Render wishlist. [3]
+  }
 
   // Orders
   async function loadMyOrders() {
@@ -546,11 +589,13 @@
         });
       });
     } catch (err) { console.error(err); listEl.innerHTML = '<div class="muted">Failed to load orders. Please try again.</div>'; }
-  } // Orders list. [3]
+  }
 
-  // Auth listener
+  // Auth state listener - handles UI updates when auth state changes
   onAuthStateChanged(auth, async (user) => {
     if (user) {
+      // User is signed in
+      console.log('User signed in:', user.email);
       await upsertUserProfile(user);
       els.loginBtn().style.display = 'none';
       els.adminBtn().style.display = 'none';
@@ -558,14 +603,25 @@
       updateUserPill(user);
       await loadMyWishlist();
       hideAuthTabs();
+      
+      // Populate profile form with current user data
+      const profileForm = els.formProfile();
+      if (profileForm) {
+        profileForm.querySelector('[name="displayName"]').value = user.displayName || '';
+        profileForm.querySelector('[name="photoURL"]').value = user.photoURL || '';
+      }
     } else {
+      // User is signed out
+      console.log('User signed out');
       els.loginBtn().style.display = '';
       els.adminBtn().style.display = '';
       els.myProfileBtn().style.display = 'none';
-      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts);
+      updateUserPill(null);
+      wishlist = new Set();
+      renderProducts(allProducts);
       showAuthTabs();
     }
-  }); // Toggle UI on auth. [3]
+  });
 
   // EmailJS contact
   window.addEventListener('load', () => {
@@ -576,7 +632,7 @@
       catch (err) { console.error(err); alert('Failed to send.'); }
       finally { btn.classList.remove('loading'); }
     });
-  }); // Contact form. [3]
+  });
 
   // Cart drawer
   function openCartDrawer() { els.cartDrawer().style.transform = 'translateX(0)'; els.cartDrawer().setAttribute('aria-hidden','false'); els.cartBackdrop().style.display = 'block'; }
@@ -603,14 +659,14 @@
     els.cartItems().querySelectorAll('.qty-inc').forEach(b => b.addEventListener('click', () => incQty(b.dataset.id)));
     els.cartItems().querySelectorAll('.qty-dec').forEach(b => b.addEventListener('click', () => decQty(b.dataset.id)));
     els.cartItems().querySelectorAll('.remove').forEach(b => b.addEventListener('click', () => removeItem(b.dataset.id)));
-  } // Cart UI. [3]
+  }
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('openCart').addEventListener('click', openCartDrawer);
     document.getElementById('closeCart').addEventListener('click', closeCartDrawer);
     document.getElementById('cartBackdrop').addEventListener('click', closeCartDrawer);
     document.getElementById('clearCart').addEventListener('click', clearCart);
     document.getElementById('checkoutBtn').addEventListener('click', openCheckout);
-  }); // Drawer wiring. [3]
+  });
 
   // Admin session (client-side gate)
   const ADMIN_SESSION_KEY = 'isAdmin';
@@ -627,11 +683,11 @@
     els.adminState().style.color = unlocked ? '#0a7' : '#92400e';
     els.productCard().style.display = unlocked ? '' : 'none';
     els.categoryCard().style.display = unlocked ? '' : 'none';
-  } // Admin gate. [3]
+  }
   els.unlockAdmin().addEventListener('click', () => {
     const code = (els.adminCode().value || '').trim();
     if (code === '741223') { setAdmin(true); alert('Admin unlocked'); } else { alert('Invalid code'); }
-  }); // Unlock. [3]
+  });
 
   // Public image uploader (no login required)
   async function uploadImagePublic(file, pathPrefix = 'public_uploads', onProgress) {
@@ -652,7 +708,7 @@
         resolve(url);
       });
     });
-  } // Upload to Storage. [4]
+  }
 
   // Wire upload buttons
   document.addEventListener('DOMContentLoaded', () => {
@@ -685,7 +741,55 @@
       } catch (err) { console.error(err); alert(err.message || 'Upload failed'); }
       finally { const prog = els.catUploadProg(); setTimeout(()=>{ prog.style.display='none'; prog.value=0; }, 600); }
     });
-  }); // Upload wiring. [4]
+  });
+
+  // Admin: Add product
+  document.getElementById('formAddProduct').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!isAdmin()) { alert('Admin locked'); return; }
+    const fd = new FormData(e.currentTarget);
+    const imageUrl = (fd.get('imageUrl') || '').toString();
+    if (!imageUrl) { alert('Please upload an image first'); return; }
+    const data = {
+      title: (fd.get('title') || '').toString(),
+      price: Number(fd.get('price') || 0),
+      imageUrl,
+      category: (fd.get('category') || '').toString(),
+      stock: parseInt(fd.get('stock') || '0', 10),
+      createdAt: Date.now(),
+    };
+    try {
+      await addDoc(collection(db, 'products'), data);
+      alert('Product added');
+      e.currentTarget.reset();
+      if (els.prodPreview()) { els.prodPreview().style.display='none'; els.prodPreview().src=''; }
+      if (els.prodImageUrl()) els.prodImageUrl().value='';
+      loadHome();
+    } catch (err) { console.error(err); alert('Failed to add product'); }
+  });
+
+  // Admin: Add category
+  document.getElementById('formAddCategory').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!isAdmin()) { alert('Admin locked'); return; }
+    const fd = new FormData(e.currentTarget);
+    const imageUrl = (fd.get('imageUrl') || '').toString();
+    if (!imageUrl) { alert('Please upload an image first'); return; }
+    const data = {
+      name: (fd.get('name') || '').toString(),
+      slug: (fd.get('slug') || '').toString(),
+      imageUrl,
+      createdAt: Date.now(),
+    };
+    try {
+      await addDoc(collection(db, 'categories'), data);
+      alert('Category added');
+      e.currentTarget.reset();
+      if (els.catPreview()) { els.catPreview().style.display='none'; els.catPreview().src=''; }
+      if (els.catImageUrl()) els.catImageUrl().value='';
+      loadHome();
+    } catch (err) { console.error(err); alert('Failed to add category'); }
+  });
 
   // UPI helpers
   function drawQRToCanvas(canvas, text) {
@@ -696,12 +800,12 @@
       ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0, size, size);
     };
     img.src = url;
-  } // Simple QR via Google Chart. [1]
+  }
 
   function buildUpiLink({ vpa, name, amount, note, txnRef }) {
     const params = new URLSearchParams({ pa: vpa, pn: name, am: String(amount||0), cu: 'INR', tn: note||'', tr: txnRef||'' });
     return `upi://pay?${params.toString()}`;
-  } // UPI deeplink. [1]
+  }
 
   function initCheckoutPaymentUI(totalAmount) {
     const radios = document.querySelectorAll('input[name="payment"]');
@@ -713,7 +817,7 @@
       const upiLink = buildUpiLink({ vpa: UPI_VPA, name: UPI_NAME, amount: totalAmount, note, txnRef: orderRef });
       upiBtn.onclick = () => { window.location.href = upiLink; };
       drawQRToCanvas(upiQR, upiLink);
-    } // Prepare deeplink and QR. [2]
+    }
     function onChange() {
       const val = document.querySelector('input[name="payment"]:checked')?.value;
       upiBox.style.display = (val === 'upi') ? 'block' : 'none';
@@ -722,7 +826,7 @@
     radios.forEach(r => r.addEventListener('change', onChange));
     onChange();
     initCheckoutPaymentUI._orderRef = orderRef; initCheckoutPaymentUI._note = note;
-  } // UPI UI. [1]
+  }
 
   // Checkout modal and order placement
   function openCheckout() {
@@ -736,10 +840,10 @@
     els.ckItemsList().innerHTML = cart.map(i => `${i.title} — ₹${i.price} × ${i.qty}`).join('<br/>');
     initCheckoutPaymentUI(subtotal);
     els.checkoutBackdrop().style.display = 'flex'; els.checkoutBackdrop().setAttribute('aria-hidden','false');
-  } // Open checkout with UPI/COD. [1]
+  }
   function closeCheckoutModal() { els.checkoutBackdrop().style.display = 'none'; els.checkoutBackdrop().setAttribute('aria-hidden','true'); }
   els.closeCheckout().addEventListener('click', closeCheckoutModal);
-  els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); }); // Modal control. [3]
+  els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); });
 
   // Celebration helpers
   function showCelebration(message) {
@@ -750,10 +854,10 @@
       confetti({ particleCount: 80, angle: 60, spread: 50, origin: { x: 0 } });
       confetti({ particleCount: 80, angle: 120, spread: 50, origin: { x: 1 } });
     }}, 150);
-  } // Confetti. [3]
+  }
   function hideCelebration() { els.celebrate().style.display = 'none'; els.celebrate().setAttribute('aria-hidden','true'); }
   els.celebrateClose().addEventListener('click', hideCelebration);
-  els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); }); // Overlay control. [3]
+  els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); });
 
   // Place order
   els.checkoutForm().addEventListener('submit', async (e) => {
@@ -772,7 +876,7 @@
       const note = initCheckoutPaymentUI._note || `${UPI_NOTE_PREFIX} ${txnRef}`;
       const upiLink = buildUpiLink({ vpa: UPI_VPA, name: UPI_NAME, amount: total, note, txnRef });
       upi = { vpa: UPI_VPA, name: UPI_NAME, link: upiLink, txnRef, note };
-    } // Save UPI info. [1]
+    }
 
     const payload = {
       userId: auth.currentUser.uid,
@@ -781,7 +885,7 @@
       phone: (fd.get('phone') || '').toString(),
       address: (fd.get('address') || '').toString(),
       paymentMethod: method,
-      upi, // null for COD
+      upi,
       currency: 'INR',
       items: cart.map(i => ({ id: i.id, title: i.title, price: Number(i.price)||0, qty: i.qty||0, imageUrl: i.imageUrl })),
       subtotal: total,
@@ -790,7 +894,7 @@
       status: 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }; // Order payload. [3]
+    };
 
     els.placeOrderBtn().classList.add('loading');
 
@@ -805,7 +909,7 @@
       loadMyOrders();
     } catch (err) { console.error(err); alert('Failed to place order. Please try again.'); }
     finally { els.placeOrderBtn().classList.remove('loading'); }
-  }); // Place order handler. [3]
+  });
 
   // Bootstrap
   updateCartBadge(); renderCart(); loadHome();
@@ -890,7 +994,10 @@
         <form id="formLogin" class="row">
           <input name="email" type="email" placeholder="Email" required />
           <input name="password" type="password" placeholder="Password" required />
-          <button class="btn primary" type="submit">Log in</button>
+          <button class="btn primary" type="submit">
+            <span class="txt">Log in</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
         </form>
         <button id="doReset" class="btn" type="button">Forgot password?</button>
       </section>
@@ -899,10 +1006,13 @@
         <form id="formSignup" class="row">
           <input name="name" placeholder="Full name" />
           <input name="email" type="email" placeholder="Email" required />
-          <input name="password" type="password" placeholder="Password (6+)" required />
-          <button class="btn primary" type="submit">Create account</button>
+          <input name="password" type="password" placeholder="Password (6+ characters)" required />
+          <button class="btn primary" type="submit">
+            <span class="txt">Create account</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
         </form>
-        <p class="muted">By continuing, an account will be created with email/password authentication.</p>
+        <p class="muted">By creating an account, you agree to our terms of service.</p>
       </section>
 
       <section id="panelProfile" class="panel">
@@ -1035,7 +1145,7 @@
               <button id="upiPayBtn" class="btn" type="button">Pay with UPI</button>
               <canvas id="upiQR" width="132" height="132" style="border:1px solid var(--border); border-radius:8px"></canvas>
             </div>
-            <p class="muted">On mobile, tap “Pay with UPI” to open an installed UPI app with details pre-filled. On desktop, scan the QR using any UPI app. After paying, return here and place the order.</p>
+            <p class="muted">On mobile, tap "Pay with UPI" to open an installed UPI app with details pre-filled. On desktop, scan the QR using any UPI app. After paying, return here and place the order.</p>
           </div>
 
           <button id="placeOrderBtn" class="btn primary" type="submit">
@@ -1073,6 +1183,6 @@
     </div>
   </div>
 
-  <footer>WELCOME TO CRODYTO</footer>
+  <footer>© 2025 Crodyto demo</footer>
 </body>
 </html>
