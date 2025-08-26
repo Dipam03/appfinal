@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>crodyto.com</title>
+<title>Crodyto Home (UPI + Full App)</title>
 <style>
-  :root { --accent:#662bd5; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); --bg:#fff; --fg:#111; --card:#fff; --border:#eee; --mutetext:#666; }
+  :root { --accent:#0066ff; --muted:#f6f8fa; --glow:rgba(0,102,255,.25); --bg:#fff; --fg:#111; --card:#fff; --border:#eee; --mutetext:#666; }
   [data-theme="dark"] { --bg:#0b0f14; --fg:#e6eef7; --card:#10161d; --border:#1f2a35; --mutetext:#a5b2c1; --glow:rgba(0,102,255,.35); }
   body { margin:0; font-family:system-ui,Segoe UI,Arial; background:var(--bg); color:var(--fg); }
   .header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card); z-index:10; }
@@ -103,7 +103,7 @@
 
   /* Checkout modal */
   .checkout-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1400; }
-  .checkout-modal { width:100%; max-width:560px; background:var(--card); color:var(--fg); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
+  .checkout-modal { width:100%; max-width:600px; background:var(--card); color:var(--fg); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.25); overflow:hidden; transform:translateY(12px); opacity:0; animation:fadeUp .25s ease forwards; }
   .checkout-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
   .checkout-body { display:grid; gap:14px; padding:14px; grid-template-columns:1fr; }
   @media (min-width: 720px) { .checkout-body { grid-template-columns:1fr 1fr; } }
@@ -113,8 +113,7 @@
   .summary h4 { margin:0 0 8px; }
   .summary .line { display:flex; justify-content:space-between; margin:4px 0; }
   .summary .items { max-height:180px; overflow:auto; border-top:1px dashed var(--border); margin-top:8px; padding-top:8px; font-size:14px; color:var(--mutetext); }
-
-  /* Orders */
+  #payMethods label { display:inline-flex; align-items:center; gap:6px; margin-right:12px; }
   .order-card { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
   .order-line { display:flex; justify-content:space-between; margin:4px 0; font-size:14px; }
   .order-items { margin-top:8px; font-size:13px; color:var(--mutetext); white-space:pre-line; display:none; }
@@ -135,6 +134,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
   import { getFirestore, collection, getDocs, query, limit, addDoc, serverTimestamp, doc, setDoc, getDoc, deleteDoc, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
   // Firebase config (provided)
   const firebaseConfig = {
@@ -147,9 +147,10 @@
     measurementId: "G-KY618BJER7",
   };
 
-  const app = initializeApp(firebaseConfig); // Firebase init. [12]
-  const auth = getAuth(app);                 // Auth. [12]
+  const app = initializeApp(firebaseConfig); // Firebase init. [3]
+  const auth = getAuth(app);                 // Auth. [3]
   const db = getFirestore(app);              // Firestore. [3]
+  const storage = getStorage(app);           // Storage. [4]
 
   // Elements
   const els = {
@@ -206,6 +207,19 @@
     formAddProduct: () => document.getElementById('formAddProduct'),
     formAddCategory: () => document.getElementById('formAddCategory'),
 
+    // Upload controls
+    prodImageFile: () => document.getElementById('prodImageFile'),
+    uploadProdImg: () => document.getElementById('uploadProdImg'),
+    prodUploadProg: () => document.getElementById('prodUploadProg'),
+    prodPreview: () => document.getElementById('prodPreview'),
+    prodImageUrl: () => document.getElementById('prodImageUrl'),
+
+    catImageFile: () => document.getElementById('catImageFile'),
+    uploadCatImg: () => document.getElementById('uploadCatImg'),
+    catUploadProg: () => document.getElementById('catUploadProg'),
+    catPreview: () => document.getElementById('catPreview'),
+    catImageUrl: () => document.getElementById('catImageUrl'),
+
     checkoutBackdrop: () => document.getElementById('checkoutBackdrop'),
     closeCheckout: () => document.getElementById('closeCheckout'),
     checkoutForm: () => document.getElementById('checkoutForm'),
@@ -214,6 +228,13 @@
     ckSubtotal: () => document.getElementById('ckSubtotal'),
     ckTotal: () => document.getElementById('ckTotal'),
     ckItemsList: () => document.getElementById('ckItemsList'),
+
+    upiBox: () => document.getElementById('upiBox'),
+    upiPayBtn: () => document.getElementById('upiPayBtn'),
+    upiQR: () => document.getElementById('upiQR'),
+    upiPayee: () => document.getElementById('upiPayee'),
+    upiAmount: () => document.getElementById('upiAmount'),
+    upiNote: () => document.getElementById('upiNote'),
 
     celebrate: () => document.getElementById('celebrate'),
     celebrateMsg: () => document.getElementById('celebrateMsg'),
@@ -224,41 +245,46 @@
   };
 
   // Theme
-  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // [1]
-  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // [1]
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); els.themeToggle().checked = (t === 'dark'); } // Modern browsers. [3]
+  function initTheme() { const t = localStorage.getItem('theme') || 'light'; applyTheme(t); } // Persist theme. [3]
   document.addEventListener('DOMContentLoaded', initTheme);
   els.themeToggle().addEventListener('change', () => {
     const t = els.themeToggle().checked ? 'dark' : 'light';
     localStorage.setItem('theme', t);
     applyTheme(t);
-  }); // [1]
+  }); // Toggle theme. [3]
 
   // State
   let allProducts = [];
   let cart = JSON.parse(localStorage.getItem('cart') || '[]');
   let wishlist = new Set();
 
+  // UPI configuration (set a valid business VPA)
+  const UPI_VPA = 'example@upi';           // TODO: replace with real VPA. [1]
+  const UPI_NAME = 'Crodyto';              // Payee name. [1]
+  const UPI_NOTE_PREFIX = 'Crodyto Order'; // Note prefix. [1]
+
   // Cart helpers
   function updateCartBadge() {
     const n = cart.reduce((s, i) => s + i.qty, 0);
     const badge = els.cartCount();
     badge.textContent = n;
-    badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse'); // [1]
-  }
-  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // [1]
+    badge.classList.remove('pulse'); void badge.offsetWidth; badge.classList.add('pulse');
+  } // Badge animation. [3]
+  function cartSave() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); } // Persist cart. [3]
   function addToCart(id) {
     const item = allProducts.find(p => p.id === id); if (!item) return;
     const existing = cart.find(c => c.id === id);
     if (existing) existing.qty += 1; else cart.push({ id: item.id, title: item.title, price: Number(item.price) || 0, imageUrl: item.imageUrl, qty: 1 });
     cartSave();
-  }
-  function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); }
-  function decQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty = Math.max(0, it.qty - 1); if (it.qty === 0) cart = cart.filter(i => i.id !== id); cartSave(); }
-  function removeItem(id) { cart = cart.filter(i => i.id !== id); cartSave(); }
-  function clearCart() { cart = []; cartSave(); }
-  function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); }
+  } // Add item. [3]
+  function incQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty += 1; cartSave(); } // Inc qty. [3]
+  function decQty(id) { const it = cart.find(i => i.id === id); if (!it) return; it.qty = Math.max(0, it.qty - 1); if (it.qty === 0) cart = cart.filter(i => i.id !== id); cartSave(); } // Dec qty. [3]
+  function removeItem(id) { cart = cart.filter(i => i.id !== id); cartSave(); } // Remove item. [3]
+  function clearCart() { cart = []; cartSave(); } // Clear cart. [3]
+  function cartSubtotalValue() { return cart.reduce((sum, i) => sum + (Number(i.price) || 0) * (i.qty || 0), 0); } // Subtotal. [3]
 
-  // Product card with wishlist heart
+  // Product card
   function cardTemplate(p, wished) {
     return `
       <div class="card">
@@ -273,7 +299,7 @@
         </div>
       </div>
     `;
-  } // [3]
+  } // Product card with wishlist heart. [3]
 
   function renderProducts(list) {
     els.productGrid().innerHTML = list.map(p => cardTemplate(p, wishlist.has(p.id))).join('');
@@ -287,7 +313,7 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // [3]
+  } // Wire product actions. [3]
 
   function renderCategories(list) {
     els.categoryGrid().innerHTML = list.map(c => `
@@ -303,16 +329,16 @@
         renderProducts(filtered);
       });
     });
-  } // [3]
+  } // Category filter. [3]
 
   async function loadHome() {
-    const catSnap = await getDocs(collection(db, 'categories')); // [3]
+    const catSnap = await getDocs(collection(db, 'categories'));
     renderCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    const qref = query(collection(db, 'products'), limit(20));   // [3]
+    const qref = query(collection(db, 'products'), limit(20));
     const prodSnap = await getDocs(qref);
     allProducts = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderProducts(allProducts);
-  }
+  } // Fetch products/categories. [3]
 
   // Search
   document.addEventListener('DOMContentLoaded', () => {
@@ -321,14 +347,14 @@
       const filtered = allProducts.filter(p => p.title.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
       renderProducts(filtered);
     });
-  });
+  }); // Simple search. [3]
 
   // Account modal
   function openAccount() { els.accountModal().style.display = 'flex'; els.accountModal().setAttribute('aria-hidden','false'); }
   function closeAccount() { els.accountModal().style.display = 'none'; els.accountModal().setAttribute('aria-hidden','true'); }
   els.loginBtn().addEventListener('click', openAccount);
   els.closeAccount().addEventListener('click', closeAccount);
-  els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); });
+  els.accountModal().addEventListener('click', (e) => { if (e.target === els.accountModal()) closeAccount(); }); // Modal control. [3]
 
   // Tabs
   function setTab(name) {
@@ -340,16 +366,16 @@
     const pmap = { login:'panelLogin', signup:'panelSignup', profile:'panelProfile', orders:'panelOrders', wishlist:'panelWishlist' };
     const tb = els[map[name]] && els[map[name]](); const pn = els[pmap[name]] && els[pmap[name]]();
     if (tb) tb.classList.add('active'); if (pn) pn.classList.add('active');
-  } // [3]
-  function openProfile() { openAccount(); setTab('profile'); } // [3]
+  } // Tab switcher. [3]
+  function openProfile() { openAccount(); setTab('profile'); } // Open profile. [3]
   document.addEventListener('DOMContentLoaded', () => {
     els.tabOrders() && els.tabOrders().addEventListener('click', () => { setTab('orders'); loadMyOrders(); });
     els.tabWishlist() && els.tabWishlist().addEventListener('click', () => { setTab('wishlist'); loadMyWishlist(); });
     els.myProfileBtn() && els.myProfileBtn().addEventListener('click', openProfile);
     els.openWishlist() && els.openWishlist().addEventListener('click', () => { openAccount(); setTab('wishlist'); loadMyWishlist(); });
-  });
+  }); // Account navigation. [3]
 
-  function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); }
+  function showAlert(msg) { const box = els.alertBox(); box.textContent = msg; box.classList.add('show'); setTimeout(()=>box.classList.remove('show'), 3500); } // Alerts. [3]
 
   // Hide/show Login & Sign up tabs on auth
   function hideAuthTabs() {
@@ -363,8 +389,8 @@
     if (pSignup) pSignup.style.display = 'none';
     const activeLogin = tLogin && tLogin.classList.contains('active');
     const activeSignup = tSignup && tSignup.classList.contains('active');
-    if (activeLogin || activeSignup) setTab('profile'); // [3]
-  }
+    if (activeLogin || activeSignup) setTab('profile');
+  } // Hide auth tabs. [3]
   function showAuthTabs() {
     const tLogin = els.tabLogin && els.tabLogin();
     const tSignup = els.tabSignup && els.tabSignup();
@@ -374,8 +400,8 @@
     if (tSignup) tSignup.style.display = '';
     if (pLogin) pLogin.style.display = '';
     if (pSignup) pSignup.style.display = '';
-    setTab('login'); // [3]
-  }
+    setTab('login');
+  } // Show auth tabs. [3]
 
   // Firestore user profile upsert
   async function upsertUserProfile(user) {
@@ -383,8 +409,8 @@
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     const base = { uid: user.uid, email: user.email || null, displayName: user.displayName || null, photoURL: user.photoURL || null, updatedAt: serverTimestamp() };
-    if (!snap.exists()) await setDoc(ref, { ...base, createdAt: serverTimestamp() }); else await setDoc(ref, base, { merge: true }); // [3]
-  }
+    if (!snap.exists()) await setDoc(ref, { ...base, createdAt: serverTimestamp() }); else await setDoc(ref, base, { merge: true });
+  } // Upsert user doc. [3]
 
   // Header user pill
   function updateUserPill(user) {
@@ -395,7 +421,7 @@
     const ph = user.photoURL || 'https://ui-avatars.com/api/?background=0D8ABC&color=fff&name=' + encodeURIComponent(name);
     els.userAvatar().src = ph;
     els.userPill().onclick = () => { openAccount(); setTab('profile'); };
-  } // [3]
+  } // Pill setup. [3]
 
   // Auth flows
   els.formLogin().addEventListener('submit', async (e) => {
@@ -403,12 +429,12 @@
     const data = new FormData(els.formLogin());
     const email = data.get('email'); const password = data.get('password');
     try {
-      await signInWithEmailAndPassword(auth, email, password); // [12]
-      await upsertUserProfile(auth.currentUser);               // [3]
+      await signInWithEmailAndPassword(auth, email, password);
+      await upsertUserProfile(auth.currentUser);
       openProfile();
       showAlert('Logged in');
     } catch (err) { showAlert(err.message); }
-  });
+  }); // Login. [3]
 
   els.formSignup().addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -416,19 +442,19 @@
     const name = (data.get('name') || '').toString();
     const email = data.get('email'); const password = data.get('password');
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password); // [12]
-      if (name) await updateProfile(cred.user, { displayName: name });         // [3]
-      await upsertUserProfile(cred.user);                                      // [3]
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      if (name) await updateProfile(cred.user, { displayName: name });
+      await upsertUserProfile(cred.user);
       openProfile();
       showAlert('Account created');
     } catch (err) { showAlert(err.message); }
-  });
+  }); // Signup. [3]
 
   els.doReset().addEventListener('click', async () => {
     const email = (new FormData(els.formLogin()).get('email') || '').toString();
     if (!email) { showAlert('Enter email in login form first'); return; }
-    try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); } // [12]
-  });
+    try { await sendPasswordResetEmail(auth, email); showAlert('Password reset email sent'); } catch (err) { showAlert(err.message); }
+  }); // Reset. [3]
 
   els.formProfile().addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -437,25 +463,25 @@
     const photoURL = (data.get('photoURL') || '').toString() || null;
     const user = auth.currentUser; if (!user) { showAlert('Not signed in'); return; }
     try {
-      await updateProfile(user, { displayName, photoURL });                    // [3]
-      await upsertUserProfile({ ...user, displayName, photoURL });            // [3]
+      await updateProfile(user, { displayName, photoURL });
+      await upsertUserProfile({ ...user, displayName, photoURL });
       document.querySelector('#panelProfile [name="displayName"]').value = displayName || '';
       document.querySelector('#panelProfile [name="photoURL"]').value = photoURL || '';
       updateUserPill({ ...user, displayName, photoURL });
       showAlert('Profile updated');
     } catch (err) { showAlert(err.message); }
-  });
+  }); // Profile save. [3]
 
   els.doSignOut().addEventListener('click', async () => {
-    await signOut(auth); showAlert('Signed out'); showAuthTabs(); setTab('login'); setAdmin(false); // [12][3]
-  });
+    await signOut(auth); showAlert('Signed out'); showAuthTabs(); setTab('login'); setAdmin(false);
+  }); // Sign out. [3]
 
   // Wishlist
-  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // [3]
+  function userWishlistCol() { const u = auth.currentUser; if (!u) return null; return collection(db, 'users', u.uid, 'wishlist'); } // Path. [3]
   async function loadMyWishlist() {
     const col = userWishlistCol(); if (!col) { wishlist = new Set(); renderWishlistPanel(); return; }
     const snap = await getDocs(col); wishlist = new Set(snap.docs.map(d => d.id)); renderWishlistPanel();
-  } // [3]
+  } // Load wishlist. [3]
   async function toggleWishlist(productId, productData) {
     const col = userWishlistCol(); if (!col) { alert('Sign in to use wishlist'); return; }
     const ref = doc(db, 'users', auth.currentUser.uid, 'wishlist', productId);
@@ -465,7 +491,7 @@
       wishlist.add(productId);
     }
     renderProducts(allProducts); renderWishlistPanel();
-  } // [3]
+  } // Toggle heart. [3]
   function renderWishlistPanel() {
     const items = allProducts.filter(p => wishlist.has(p.id));
     els.wishlistList().innerHTML = items.length ? items.map(p => cardTemplate(p, true)).join('') : '<div class="muted">No items in wishlist.</div>';
@@ -479,41 +505,28 @@
         btn.addEventListener('click', () => addToCart(btn.dataset.id));
       }
     });
-  } // [3]
+  } // Render wishlist. [3]
 
-  // Orders: robust loader with details and error handling
+  // Orders
   async function loadMyOrders() {
     const listEl = els.ordersList();
-    if (!auth.currentUser) {
-      listEl.innerHTML = '<div class="muted">Sign in to see orders.</div>';
-      return;
-    }
+    if (!auth.currentUser) { listEl.innerHTML = '<div class="muted">Sign in to see orders.</div>'; return; }
     listEl.innerHTML = '<div class="muted">Loading orders…</div>';
     try {
-      const qref = query(
-        collection(db, 'orders'),
-        where('userId', '==', auth.currentUser.uid),
-        orderBy('createdAt', 'desc')
-      ); // Requires composite index if prompted. [3][1]
+      const qref = query(collection(db, 'orders'), where('userId','==',auth.currentUser.uid), orderBy('createdAt','desc'));
       const snap = await getDocs(qref);
-      if (snap.empty) {
-        listEl.innerHTML = '<div class="muted">No orders yet.</div>';
-        return;
-      }
+      if (snap.empty) { listEl.innerHTML = '<div class="muted">No orders yet.</div>'; return; }
       listEl.innerHTML = snap.docs.map(d => {
         const o = d.data();
-        const createdAt =
-          (o.createdAt && o.createdAt.toDate && o.createdAt.toDate()) ?
-            o.createdAt.toDate().toLocaleString() : '';
+        const createdAt = (o.createdAt && o.createdAt.toDate && o.createdAt.toDate()) ? o.createdAt.toDate().toLocaleString() : '';
         const items = Array.isArray(o.items) ? o.items : [];
-        const itemsText = items.map(i =>
-          `${i.title} × ${i.qty} = ₹${(Number(i.price)||0) * (i.qty||0)}`
-        ).join('\n');
+        const itemsText = items.map(i => `${i.title} × ${i.qty} = ₹${(Number(i.price)||0) * (i.qty||0)}`).join('\n');
         return `
           <div class="order-card" data-id="${d.id}">
             <div class="order-line"><span>Order ID</span><strong>${d.id}</strong></div>
             <div class="order-line"><span>Date</span><strong>${createdAt}</strong></div>
             <div class="order-line"><span>Status</span><strong>${o.status || 'pending'}</strong></div>
+            <div class="order-line"><span>Method</span><strong>${o.paymentMethod || 'cod'}</strong></div>
             <div class="order-line"><span>Total</span><strong>₹${o.total ?? o.subtotal ?? 0}</strong></div>
             <div class="order-items">${itemsText}</div>
             <div style="margin-top:8px;display:flex;gap:8px">
@@ -523,7 +536,6 @@
           </div>
         `;
       }).join('');
-      // Wire expand/collapse
       listEl.querySelectorAll('.order-card .toggle-items').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const card = e.target.closest('.order-card');
@@ -533,41 +545,38 @@
           btn.textContent = show ? 'Hide details' : 'View details';
         });
       });
-    } catch (err) {
-      console.error(err);
-      listEl.innerHTML = '<div class="muted">Failed to load orders. Please try again.</div>';
-    }
-  } // [3][1]
+    } catch (err) { console.error(err); listEl.innerHTML = '<div class="muted">Failed to load orders. Please try again.</div>'; }
+  } // Orders list. [3]
 
-  // Auth listener: toggle header, pill, wishlist, and auth tabs
+  // Auth listener
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      await upsertUserProfile(user);                       // [3]
+      await upsertUserProfile(user);
       els.loginBtn().style.display = 'none';
       els.adminBtn().style.display = 'none';
       els.myProfileBtn().style.display = '';
-      updateUserPill(user);                                // [3]
-      await loadMyWishlist();                              // [3]
-      hideAuthTabs();                                      // [3]
+      updateUserPill(user);
+      await loadMyWishlist();
+      hideAuthTabs();
     } else {
       els.loginBtn().style.display = '';
       els.adminBtn().style.display = '';
       els.myProfileBtn().style.display = 'none';
-      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts); // [3]
-      showAuthTabs();                                      // [3]
+      updateUserPill(null); wishlist = new Set(); renderProducts(allProducts);
+      showAuthTabs();
     }
-  });
+  }); // Toggle UI on auth. [3]
 
   // EmailJS contact
   window.addEventListener('load', () => {
     const form = els.contactForm(); const btn = els.sendBtn();
     form.addEventListener('submit', async (e) => {
       e.preventDefault(); btn.classList.add('loading');
-      try { await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); form.reset(); alert('Message sent!'); } // [11]
+      try { await emailjs.sendForm('service_c4p68ag', 'template_214uijp', form); form.reset(); alert('Message sent!'); }
       catch (err) { console.error(err); alert('Failed to send.'); }
       finally { btn.classList.remove('loading'); }
     });
-  });
+  }); // Contact form. [3]
 
   // Cart drawer
   function openCartDrawer() { els.cartDrawer().style.transform = 'translateX(0)'; els.cartDrawer().setAttribute('aria-hidden','false'); els.cartBackdrop().style.display = 'block'; }
@@ -594,14 +603,14 @@
     els.cartItems().querySelectorAll('.qty-inc').forEach(b => b.addEventListener('click', () => incQty(b.dataset.id)));
     els.cartItems().querySelectorAll('.qty-dec').forEach(b => b.addEventListener('click', () => decQty(b.dataset.id)));
     els.cartItems().querySelectorAll('.remove').forEach(b => b.addEventListener('click', () => removeItem(b.dataset.id)));
-  }
+  } // Cart UI. [3]
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('openCart').addEventListener('click', openCartDrawer);
     document.getElementById('closeCart').addEventListener('click', closeCartDrawer);
     document.getElementById('cartBackdrop').addEventListener('click', closeCartDrawer);
     document.getElementById('clearCart').addEventListener('click', clearCart);
     document.getElementById('checkoutBtn').addEventListener('click', openCheckout);
-  });
+  }); // Drawer wiring. [3]
 
   // Admin session (client-side gate)
   const ADMIN_SESSION_KEY = 'isAdmin';
@@ -618,45 +627,119 @@
     els.adminState().style.color = unlocked ? '#0a7' : '#92400e';
     els.productCard().style.display = unlocked ? '' : 'none';
     els.categoryCard().style.display = unlocked ? '' : 'none';
-  }
+  } // Admin gate. [3]
   els.unlockAdmin().addEventListener('click', () => {
     const code = (els.adminCode().value || '').trim();
     if (code === '741223') { setAdmin(true); alert('Admin unlocked'); } else { alert('Invalid code'); }
-  }); // [3]
+  }); // Unlock. [3]
 
-  // Admin: Add product
-  document.getElementById('formAddProduct').addEventListener('submit', async (e) => {
-    e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
-    const fd = new FormData(e.currentTarget);
-    const data = { title: (fd.get('title')||'').toString(), price: Number(fd.get('price')||0), imageUrl: (fd.get('imageUrl')||'').toString(), category: (fd.get('category')||'').toString(), stock: parseInt(fd.get('stock')||'0',10), createdAt: Date.now() };
-    try { await addDoc(collection(db,'products'), data); alert('Product added'); e.currentTarget.reset(); loadHome(); } // [3]
-    catch (err) { console.error(err); alert('Failed to add product'); }
-  });
+  // Public image uploader (no login required)
+  async function uploadImagePublic(file, pathPrefix = 'public_uploads', onProgress) {
+    if (!file) throw new Error('No file selected');
+    const safeName = (file.name || 'image').replace(/\s+/g, '_').replace(/[^A-Za-z0-9._-]/g, '');
+    const ts = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `${pathPrefix}/${ts}_${rand}_${safeName}`;
+    const ref = sRef(storage, path);
+    const metadata = { contentType: file.type || 'image/jpeg' };
+    const task = uploadBytesResumable(ref, file, metadata);
+    return await new Promise((resolve, reject) => {
+      task.on('state_changed', (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        onProgress && onProgress(pct);
+      }, reject, async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve(url);
+      });
+    });
+  } // Upload to Storage. [4]
 
-  // Admin: Add category
-  document.getElementById('formAddCategory').addEventListener('submit', async (e) => {
-    e.preventDefault(); if (!isAdmin()) { alert('Admin locked'); return; }
-    const fd = new FormData(e.currentTarget);
-    const data = { name:(fd.get('name')||'').toString(), slug:(fd.get('slug')||'').toString(), imageUrl:(fd.get('imageUrl')||'').toString(), createdAt: Date.now() };
-    try { await addDoc(collection(db,'categories'), data); alert('Category added'); e.currentTarget.reset(); loadHome(); } // [3]
-    catch (err) { console.error(err); alert('Failed to add category'); }
-  });
+  // Wire upload buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    const upProd = els.uploadProdImg && els.uploadProdImg();
+    if (upProd) upProd.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const file = els.prodImageFile().files;
+        const prog = els.prodUploadProg(); const preview = els.prodPreview();
+        prog.style.display = 'block';
+        const url = await uploadImagePublic(file, 'public_uploads/products', (pct) => { prog.value = pct; });
+        els.prodImageUrl().value = url;
+        preview.src = url; preview.style.display = 'block';
+        alert('Product image uploaded');
+      } catch (err) { console.error(err); alert(err.message || 'Upload failed'); }
+      finally { const prog = els.prodUploadProg(); setTimeout(()=>{ prog.style.display='none'; prog.value=0; }, 600); }
+    });
+
+    const upCat = els.uploadCatImg && els.uploadCatImg();
+    if (upCat) upCat.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const file = els.catImageFile().files;
+        const prog = els.catUploadProg(); const preview = els.catPreview();
+        prog.style.display = 'block';
+        const url = await uploadImagePublic(file, 'public_uploads/categories', (pct) => { prog.value = pct; });
+        els.catImageUrl().value = url;
+        preview.src = url; preview.style.display = 'block';
+        alert('Category image uploaded');
+      } catch (err) { console.error(err); alert(err.message || 'Upload failed'); }
+      finally { const prog = els.catUploadProg(); setTimeout(()=>{ prog.style.display='none'; prog.value=0; }, 600); }
+    });
+  }); // Upload wiring. [4]
+
+  // UPI helpers
+  function drawQRToCanvas(canvas, text) {
+    const url = 'https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=' + encodeURIComponent(text);
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const ctx = canvas.getContext('2d'); const size = Math.min(canvas.width, canvas.height);
+      ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0, size, size);
+    };
+    img.src = url;
+  } // Simple QR via Google Chart. [1]
+
+  function buildUpiLink({ vpa, name, amount, note, txnRef }) {
+    const params = new URLSearchParams({ pa: vpa, pn: name, am: String(amount||0), cu: 'INR', tn: note||'', tr: txnRef||'' });
+    return `upi://pay?${params.toString()}`;
+  } // UPI deeplink. [1]
+
+  function initCheckoutPaymentUI(totalAmount) {
+    const radios = document.querySelectorAll('input[name="payment"]');
+    const upiBox = els.upiBox(); const upiPayee = els.upiPayee(); const upiAmount = els.upiAmount(); const upiNoteEl = els.upiNote();
+    const upiBtn = els.upiPayBtn(); const upiQR = els.upiQR();
+    const orderRef = 'ORD-' + Date.now(); const note = `${UPI_NOTE_PREFIX} ${orderRef}`;
+    upiPayee.textContent = UPI_VPA; upiAmount.textContent = `₹${totalAmount}`; upiNoteEl.textContent = note;
+    function refreshUPI() {
+      const upiLink = buildUpiLink({ vpa: UPI_VPA, name: UPI_NAME, amount: totalAmount, note, txnRef: orderRef });
+      upiBtn.onclick = () => { window.location.href = upiLink; };
+      drawQRToCanvas(upiQR, upiLink);
+    } // Prepare deeplink and QR. [2]
+    function onChange() {
+      const val = document.querySelector('input[name="payment"]:checked')?.value;
+      upiBox.style.display = (val === 'upi') ? 'block' : 'none';
+      if (val === 'upi') refreshUPI();
+    }
+    radios.forEach(r => r.addEventListener('change', onChange));
+    onChange();
+    initCheckoutPaymentUI._orderRef = orderRef; initCheckoutPaymentUI._note = note;
+  } // UPI UI. [1]
 
   // Checkout modal and order placement
   function openCheckout() {
-    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; } // [12]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }          // [3]
+    if (!auth.currentUser) { alert('Sign in to continue to checkout.'); return; }
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }
     els.checkoutForm().querySelector('[name="email"]').value = auth.currentUser.email || '';
     const subtotal = cartSubtotalValue();
     els.ckItemsCount().textContent = cart.reduce((s,i)=>s+(i.qty||0),0);
     els.ckSubtotal().textContent = `₹${subtotal}`;
     els.ckTotal().textContent = `₹${subtotal}`;
     els.ckItemsList().innerHTML = cart.map(i => `${i.title} — ₹${i.price} × ${i.qty}`).join('<br/>');
+    initCheckoutPaymentUI(subtotal);
     els.checkoutBackdrop().style.display = 'flex'; els.checkoutBackdrop().setAttribute('aria-hidden','false');
-  }
+  } // Open checkout with UPI/COD. [1]
   function closeCheckoutModal() { els.checkoutBackdrop().style.display = 'none'; els.checkoutBackdrop().setAttribute('aria-hidden','true'); }
   els.closeCheckout().addEventListener('click', closeCheckoutModal);
-  els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); });
+  els.checkoutBackdrop().addEventListener('click', (e) => { if (e.target === els.checkoutBackdrop()) closeCheckoutModal(); }); // Modal control. [3]
 
   // Celebration helpers
   function showCelebration(message) {
@@ -667,59 +750,71 @@
       confetti({ particleCount: 80, angle: 60, spread: 50, origin: { x: 0 } });
       confetti({ particleCount: 80, angle: 120, spread: 50, origin: { x: 1 } });
     }}, 150);
-  }
+  } // Confetti. [3]
   function hideCelebration() { els.celebrate().style.display = 'none'; els.celebrate().setAttribute('aria-hidden','true'); }
   els.celebrateClose().addEventListener('click', hideCelebration);
-  els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); });
+  els.celebrate().addEventListener('click', (e)=>{ if (e.target === els.celebrate()) hideCelebration(); }); // Overlay control. [3]
 
   // Place order
   els.checkoutForm().addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!auth.currentUser) { alert('Not signed in.'); return; } // [12]
-    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; } // [3]
+    if (!auth.currentUser) { alert('Not signed in.'); return; }
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }
 
     const fd = new FormData(els.checkoutForm());
+    const method = (document.querySelector('input[name="payment"]:checked')?.value) || 'cod';
+    const total = cartSubtotalValue();
+
+    // Optional UPI metadata
+    let upi = null;
+    if (method === 'upi') {
+      const txnRef = initCheckoutPaymentUI._orderRef || ('ORD-' + Date.now());
+      const note = initCheckoutPaymentUI._note || `${UPI_NOTE_PREFIX} ${txnRef}`;
+      const upiLink = buildUpiLink({ vpa: UPI_VPA, name: UPI_NAME, amount: total, note, txnRef });
+      upi = { vpa: UPI_VPA, name: UPI_NAME, link: upiLink, txnRef, note };
+    } // Save UPI info. [1]
+
     const payload = {
       userId: auth.currentUser.uid,
       email: (fd.get('email') || '').toString(),
       fullName: (fd.get('fullName') || '').toString(),
       phone: (fd.get('phone') || '').toString(),
       address: (fd.get('address') || '').toString(),
-      payment: (fd.get('payment') || '').toString(),
+      paymentMethod: method,
+      upi, // null for COD
       currency: 'INR',
       items: cart.map(i => ({ id: i.id, title: i.title, price: Number(i.price)||0, qty: i.qty||0, imageUrl: i.imageUrl })),
-      subtotal: cartSubtotalValue(),
+      subtotal: total,
       shipping: 0,
-      total: cartSubtotalValue(),
+      total: total,
       status: 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    };
+    }; // Order payload. [3]
 
     els.placeOrderBtn().classList.add('loading');
 
     try {
-      const ref = await addDoc(collection(db, 'orders'), payload); // [3]
+      const ref = await addDoc(collection(db, 'orders'), payload);
       const orderId = ref.id;
       try {
         const itemsText = payload.items.map(i => `${i.title} x${i.qty} = ₹${i.price * i.qty}`).join('\n');
-        await emailjs.send('service_c4p68ag', 'template_214uijp', { name: payload.fullName, email: payload.email, order_id: orderId, items_text: itemsText, total: `₹${payload.total}` }); // [11]
+        await emailjs.send('service_c4p68ag', 'template_214uijp', { name: payload.fullName, email: payload.email, order_id: orderId, items_text: itemsText, total: `₹${payload.total}` });
       } catch (emailErr) { console.warn('Email send failed (continuing):', emailErr); }
       cart = []; localStorage.setItem('cart', JSON.stringify(cart)); updateCartBadge(); renderCart(); closeCheckoutModal(); showCelebration(`Order ID: ${orderId}`);
-      // Prefetch orders so the Orders tab is ready
-      loadMyOrders(); // [13]
+      loadMyOrders();
     } catch (err) { console.error(err); alert('Failed to place order. Please try again.'); }
     finally { els.placeOrderBtn().classList.remove('loading'); }
-  });
+  }); // Place order handler. [3]
 
   // Bootstrap
-  updateCartBadge(); renderCart(); loadHome(); // [3]
+  updateCartBadge(); renderCart(); loadHome();
 </script>
 
 <!-- EmailJS SDK + init -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
 <script defer>
-  window.addEventListener('load', () => { emailjs.init('E8cAV9p-pSYDnM8kE'); }); /* EmailJS public key */ <!-- [11] -->
+  window.addEventListener('load', () => { emailjs.init('E8cAV9p-pSYDnM8kE'); });
 </script>
 <!-- Canvas Confetti CDN -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js" defer></script>
@@ -872,7 +967,16 @@
           <form id="formAddProduct" class="row">
             <input name="title" placeholder="Title" required />
             <input name="price" type="number" step="0.01" placeholder="Price" required />
-            <input name="imageUrl" type="url" placeholder="Image URL" required />
+            <!-- Image upload (Product) -->
+            <div class="row">
+              <input id="prodImageFile" type="file" accept="image/*" />
+              <div style="display:flex;gap:8px;align-items:center">
+                <button id="uploadProdImg" class="btn">Upload image</button>
+                <progress id="prodUploadProg" value="0" max="100" style="width:160px; height:8px; display:none"></progress>
+              </div>
+              <img id="prodPreview" alt="preview" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:none" />
+              <input name="imageUrl" id="prodImageUrl" type="hidden" />
+            </div>
             <input name="category" placeholder="Category slug (e.g., fashion)" required />
             <input name="stock" type="number" step="1" placeholder="Stock (e.g., 20)" required />
             <button class="btn primary" type="submit">Add product</button>
@@ -884,7 +988,16 @@
           <form id="formAddCategory" class="row">
             <input name="name" placeholder="Name (e.g., Fashion)" required />
             <input name="slug" placeholder="Slug (e.g., fashion)" required />
-            <input name="imageUrl" type="url" placeholder="Image URL" required />
+            <!-- Image upload (Category) -->
+            <div class="row">
+              <input id="catImageFile" type="file" accept="image/*" />
+              <div style="display:flex;gap:8px;align-items:center">
+                <button id="uploadCatImg" class="btn">Upload image</button>
+                <progress id="catUploadProg" value="0" max="100" style="width:160px; height:8px; display:none"></progress>
+              </div>
+              <img id="catPreview" alt="preview" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:none" />
+              <input name="imageUrl" id="catImageUrl" type="hidden" />
+            </div>
             <button class="btn primary" type="submit">Add category</button>
           </form>
         </div>
@@ -905,9 +1018,26 @@
           <input name="email" type="email" placeholder="Email for updates" required />
           <input name="phone" type="tel" placeholder="Phone" required />
           <textarea name="address" placeholder="Shipping address" rows="4" required></textarea>
-          <select name="payment" required>
-            <option value="cod">Cash on Delivery</option>
-          </select>
+
+          <!-- Payment methods: COD + UPI -->
+          <div class="ck-row" id="payMethods">
+            <label><input type="radio" name="payment" value="cod" checked /> Cash on Delivery</label>
+            <label><input type="radio" name="payment" value="upi" /> UPI</label>
+          </div>
+
+          <!-- UPI box -->
+          <div id="upiBox" class="summary" style="display:none; margin-top:8px">
+            <h4>UPI payment</h4>
+            <div class="line"><span>Payee</span><strong id="upiPayee">example@upi</strong></div>
+            <div class="line"><span>Amount</span><strong id="upiAmount">₹0</strong></div>
+            <div class="line"><span>Note</span><strong id="upiNote">Crodyto order</strong></div>
+            <div style="display:flex; gap:12px; align-items:center; margin-top:8px; flex-wrap:wrap">
+              <button id="upiPayBtn" class="btn" type="button">Pay with UPI</button>
+              <canvas id="upiQR" width="132" height="132" style="border:1px solid var(--border); border-radius:8px"></canvas>
+            </div>
+            <p class="muted">On mobile, tap “Pay with UPI” to open an installed UPI app with details pre-filled. On desktop, scan the QR using any UPI app. After paying, return here and place the order.</p>
+          </div>
+
           <button id="placeOrderBtn" class="btn primary" type="submit">
             <span class="txt">Place order</span>
             <span class="spinner" aria-hidden="true"></span>
@@ -943,6 +1073,6 @@
     </div>
   </div>
 
-  <footer>welcome to Crodyto</footer>
+  <footer>WELCOME TO CRODYTO</footer>
 </body>
 </html>
